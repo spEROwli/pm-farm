@@ -1,0 +1,59 @@
+name: Daily PM Role Scrape
+
+on:
+  schedule:
+    - cron: '30 11 * * *'  # 7:30am ET (UTC-4 summer) / 6:30am ET (UTC-5 winter)
+  workflow_dispatch:        # allow manual trigger from GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install google-api-python-client google-auth-oauthlib
+
+      - name: Expand company list (YC directory)
+        run: python3 discover.py
+        continue-on-error: true
+        timeout-minutes: 3
+
+      - name: Promote Adzuna companies to direct ATS (weekly, Mondays or manual)
+        env:
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+        run: |
+          if [ "$(date +%u)" = "1" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python3 discover.py --from-adzuna
+          else
+            echo "Skipping Adzuna promotion (runs Mondays only)"
+          fi
+        continue-on-error: true
+        timeout-minutes: 10
+
+      - name: Run scraper
+        env:
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+        run: python3 pmfarm.py
+
+      - name: Build HTML
+        run: python3 build_page.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pm_roles.html verified_companies.json
+          git diff --cached --quiet && echo "No changes" || { git commit -m "daily update $(date -u +%Y-%m-%d)" && git pull --rebase origin main && git push; }

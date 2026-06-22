@@ -88,11 +88,14 @@ Fast to install, zero dependency drift.
 what the ATS returned. Blank experience field = the JD didn't state one. The
 scraper never guesses or fills in. See [`SCRAPER_RULES.md`](SCRAPER_RULES.md).
 
-**Self-healing company list.** `discover.py` seeds new ATS slugs from YC's public
-company directory — this adds YC-backed companies to the curated list and hits their
-Greenhouse/Ashby/Lever APIs directly. It is not a feed from YC's job board.
-`companies.db` tracks hit rates per slug; ones that return nothing across several runs
-are pruned automatically.
+**Self-healing company list.** `discover.py` seeds new ATS slugs from three sources:
+YC's public company directory (default), Forbes Cloud 100 (`--from-forbes`, parses
+`__NEXT_DATA__` JSON from the Next.js list page), and the a16z portfolio
+(`--from-a16z`, static fetch with Bright Data JS-render fallback). Each discovered
+company is probed against Greenhouse/Ashby/Lever and promoted to
+`verified_companies.json` with a `source` tag — no API key needed for direct ATS
+hits on future runs. `companies.db` tracks hit rates per slug; ones that return
+nothing across several runs are pruned automatically.
 
 ## Running it
 

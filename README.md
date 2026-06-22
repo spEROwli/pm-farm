@@ -81,9 +81,8 @@ flows through the same title/experience/freshness gate, so a role from a search
 API is held to the exact same bar as a direct ATS hit.
 
 **Pure standard library.** `urllib`, `csv`, `sqlite3`, `re`, `ThreadPoolExecutor`
-— no requests, no BeautifulSoup, no pandas. The only third-party dependency is
-the Google API client for the optional Gmail sync. Fast to install, zero
-dependency drift.
+— no requests, no BeautifulSoup, no pandas. Zero third-party dependencies.
+Fast to install, zero dependency drift.
 
 **Data fidelity over convenience.** Every field on the dashboard reflects exactly
 what the ATS returned. Blank experience field = the JD didn't state one. The
@@ -98,13 +97,6 @@ are pruned automatically.
 ## Running it
 
 ```bash
-# Install the one optional dependency (Gmail sync only)
-pip install -r requirements.txt
-
-# Full pipeline
-bash run_daily.sh
-
-# Or step by step:
 python3 pmfarm.py         # scrape → pm_roles.csv
 python3 build_page.py     # render → pm_roles.html
 ```
@@ -149,7 +141,6 @@ deduplication, location classification, experience parsing, and output rendering
 | Adzuna | `api.adzuna.com` | app id/key |
 | The Muse | `themuse.com/api` | none |
 | hiring.cafe (optional) | via Bright Data Web Unlocker | API key |
-| Gmail (optional) | Gmail API | OAuth |
 
 ## Stack
 

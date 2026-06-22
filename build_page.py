@@ -9,7 +9,7 @@ Layout:
   • Primary split: Bucket A (in-range) on top, Bucket B (4+ yrs explicit) collapsed.
       A = years ≤3 stated OR unstated.
   • Within A, sort by FIT: freshness → priority sector → NYC/remote → date.
-  • Filter chips: APM · NYC · Remote · Priority · Fit · Hide applied.
+  • Filter chips: APM · NYC · SF · Remote · Fresh  (match the three geo buckets exactly).
 
 SCRAPER_RULES: every card is rendered straight from pm_roles.csv, which the
 scraper fills only from live ATS JSON. The years line is the verbatim JD sentence
@@ -440,7 +440,9 @@ def build():
   <div class="chips" id="chips">
     <button class="chip" data-f="apm"    aria-pressed="false">APM</button>
     <button class="chip" data-f="nyc"    aria-pressed="false">NYC</button>
+    <button class="chip" data-f="sf"     aria-pressed="false">SF</button>
     <button class="chip" data-f="remote" aria-pressed="false">Remote</button>
+    <button class="chip" data-f="fresh"  aria-pressed="false">Fresh</button>
   </div>
  </div>
 </header>
@@ -470,7 +472,7 @@ def build():
   const active = new Set();
 
   const ROLE_TYPES = ['pm','apm'];
-  const LOC_TYPES  = ['nyc','remote','intl'];
+  const LOC_TYPES  = ['nyc','sf','remote','intl'];
 
   function locMatch(card, f) {{
     const lc = card.dataset.loc;

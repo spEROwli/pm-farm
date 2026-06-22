@@ -1,7 +1,7 @@
 {
   "_meta": {
     "description": "Verified ATS slug cache. Each entry has a confirmed job board URL. Used by pmfarm.py and discover.py to avoid slug-guessing on every run.",
-    "last_updated": "2026-06-20",
+    "last_updated": "2026-06-22",
     "total": 141
   },
   "greenhouse": [
@@ -653,6 +653,30 @@
     {
       "slug": "samsara",
       "name": "Samsara",
+      "tags": [],
+      "source": "adzuna-discover"
+    },
+    {
+      "slug": "coreweave",
+      "name": "CoreWeave",
+      "tags": [],
+      "source": "adzuna-discover"
+    },
+    {
+      "slug": "garnerhealth",
+      "name": "Garner Health",
+      "tags": [],
+      "source": "adzuna-discover"
+    },
+    {
+      "slug": "unframe",
+      "name": "Unframe",
+      "tags": [],
+      "source": "adzuna-discover"
+    },
+    {
+      "slug": "oscar",
+      "name": "Oscar Health",
       "tags": [],
       "source": "adzuna-discover"
     }

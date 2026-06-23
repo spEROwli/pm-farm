@@ -411,8 +411,9 @@ def _extract_a16z_names(html: str) -> list[str]:
     """
     Extract portfolio company names from a16z HTML.
 
-    Tries __NEXT_DATA__ JSON first (a16z is also Next.js), then falls back to
-    heading-tag regex. Returns a deduplicated list of plausible company names.
+    Primary: parse the `portfolio_companies = [...]` JS variable embedded in
+    the page (present after BD renders the page). Falls back to __NEXT_DATA__
+    JSON, then heading-tag regex. Returns a deduplicated list of company names.
     """
     names: list[str] = []
     seen: set[str] = set()
@@ -427,17 +428,29 @@ def _extract_a16z_names(html: str) -> list[str]:
             seen.add(n.lower())
             names.append(n)
 
-    # Strategy 1: __NEXT_DATA__ JSON
-    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+    # Strategy 1: portfolio_companies JS variable (full list, embedded after BD render)
+    m = re.search(r'portfolio_companies\s*=\s*(\[.*?\]);', html, re.DOTALL)
     if m:
         try:
-            data = json.loads(m.group(1))
-            for n in _walk_for_names(data, "name"):
-                _add(n)
+            companies = json.loads(m.group(1))
+            for co in companies:
+                if isinstance(co, dict) and co.get("title"):
+                    _add(co["title"])
         except Exception:
             pass
 
-    # Strategy 2: heading tags (works on both static and BD-rendered HTML)
+    # Strategy 2: __NEXT_DATA__ JSON
+    if len(names) < 5:
+        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+        if m:
+            try:
+                data = json.loads(m.group(1))
+                for n in _walk_for_names(data, "name"):
+                    _add(n)
+            except Exception:
+                pass
+
+    # Strategy 3: heading tags fallback
     if len(names) < 5:
         for n in re.findall(r'<h[23][^>]*>([^<]{2,60})</h[23]>', html):
             _add(n)

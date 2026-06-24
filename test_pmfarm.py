@@ -839,7 +839,7 @@ def test_13_brightdata_parse():
     check("BD-1 company",                         j["company"],        "Acme Corp")
     check("BD-1 title",                           j["title"],          "Product Manager")
     check("BD-1 url",                             j["url"],            "https://apply.example.com/123")
-    check("BD-1 days_old unknown (no date used)", j["days_old"],       "unknown")
+    check("BD-1 days_old is today (fetch date used)", j["days_old"],   "0")
     check("BD-1 years_raw parsed from yoe",       j["years_raw"],      "2")
 
     # Missing apply_url -> returns None (filtered out)

@@ -279,7 +279,7 @@ def _render_bucket(rows: list) -> str:
 
 
 _PAGE_DESC = ("Live PM board · scraped daily from Greenhouse, Ashby, Lever &amp; hiring.cafe "
-              "via their ATS APIs · an experiment in using Claude to automate job search")
+              "· an experiment in using Claude to automate job search")
 
 
 def build():

@@ -885,7 +885,7 @@ def _hiringcafe_job(h: dict) -> dict | None:
     company  = (v5.get("company_name")
                 or (h.get("enriched_company_data") or {}).get("name") or "(unknown)")
     location = v5.get("formatted_workplace_location") or ""
-    date_str = None  # estimated_publish_date reflects original post date, not last-active; treat like Ashby (no reliable date)
+    date_str = datetime.datetime.now(datetime.timezone.utc).isoformat()  # hiring.cafe only surfaces active listings; treat fetch date as post date
     parts: list[str] = []
     yoe = v5.get("min_industry_and_role_yoe")
     if not v5.get("is_min_industry_and_role_yoe_not_mentioned") and yoe is not None:

@@ -118,7 +118,7 @@ _BRIGHTDATA_KEY_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__
 _BRIGHTDATA_RUN_STAMP    = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".brightdata_last_run")
 BRIGHTDATA_CLI           = os.environ.get("BRIGHTDATA_CLI", "bdata")          # CLI name or absolute path
 BRIGHTDATA_UNLOCKER_ZONE = os.environ.get("BRIGHTDATA_UNLOCKER_ZONE", "web_unlocker1")
-BRIGHTDATA_MIN_HOURS     = 12   # once-per-12h spend lock; blocks accidental manual re-runs from double-billing
+BRIGHTDATA_MIN_HOURS     = 2    # 2h cooldown; MAX_PAGE_LOADS=30 is the real cost ceiling (~$0.045 max/run)
 
 # hiring.cafe URLs are generated as /jobs/<role-slug>/locations/<geo-slug>. Changing
 # coverage = editing these two lists (parametric). Verified geo slugs: "new-york"

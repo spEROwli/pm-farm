@@ -28,6 +28,18 @@ jobs:
         continue-on-error: true
         timeout-minutes: 3
 
+      - name: Expand company list (a16z portfolio, weekly Mondays)
+        env:
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
+        run: |
+          if [ "$(date +%u)" = "1" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python3 discover.py --from-a16z
+          else
+            echo "Skipping a16z (runs Mondays only)"
+          fi
+        continue-on-error: true
+        timeout-minutes: 5
+
       - name: Promote Adzuna companies to direct ATS (weekly, Mondays or manual)
         env:
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}

@@ -203,6 +203,17 @@ _US_NON_NYC = [
     "detroit", "cleveland", "cincinnati", "indianapolis", "st. louis",
     "kansas city", "new orleans", "richmond", "baltimore", "washington dc",
     "washington, dc", "washington, d.c", "washington",
+    # US state names — catch "City, State, United States" patterns from hiring.cafe
+    # so "Fort Collins, Colorado, United States" doesn't mis-classify as remote.
+    # Omit: new york (NYC), california (SF Bay Area), texas/florida/illinois (cities already there).
+    "colorado", "kansas", "ohio", "pennsylvania", "maryland", "georgia",
+    "virginia", "kentucky", "indiana", "alabama", "tennessee", "louisiana",
+    "arkansas", "mississippi", "oklahoma", "north carolina", "south carolina",
+    "iowa", "nebraska", "missouri", "michigan", "minnesota", "wisconsin",
+    "montana", "wyoming", "idaho", "utah", "nevada", "new mexico",
+    "west virginia", "north dakota", "south dakota", "vermont", "maine",
+    "new hampshire", "hawaii", "alaska", "connecticut", "delaware", "rhode island",
+    "district of columbia",
 ]
 
 # Country/region markers that make a role non-US even if it says "remote"
@@ -972,12 +983,12 @@ def _sort_key(j: dict) -> tuple:
 def _output(jobs: list[dict], skipped: int = 0):
     jobs.sort(key=_sort_key)
 
-    print(f"\n{'─' * 72}")
+    print(f"\n{'-' * 72}")
     for j in jobs:
         age = f"{j['days_old']}d" if j["days_old"] != "unknown" else "?d"
         yrs = j["years_raw"] if j["years_raw"] != "unknown" else "?"
         hw   = "  *** HW/MEDTECH SIGNAL ***" if j.get("hw_signal") else ""
-        lang = "  🌐 LANG" if j.get("lang_signal") else ""
+        lang = "  [LANG]" if j.get("lang_signal") else ""
         print(f"[{j['source']:11s}] {j['company']:18s}  {j['title']}{hw}{lang}")
         print(f"  {(j['location'] or j['loc_class']):32s}  age={age:<6s}  yrs_req={yrs}")
         if j["years_context"]:
@@ -994,7 +1005,7 @@ def _output(jobs: list[dict], skipped: int = 0):
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         w.writerows(jobs)
-    print(f"Saved {len(jobs)} role(s) → {OUTPUT_FILE}")
+    print(f"Saved {len(jobs)} role(s) -> {OUTPUT_FILE}")
     print(f"Fill the 'applied' column as you go. Save as {APPLIED_FILE} to dedupe next run.")
 
 
@@ -1009,7 +1020,7 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
         print(f"\nGmail applied set: {len(gmail_set)} companies")
         if gmail_set:
             for norm, raw, subj, date in sorted(gmail_evidence, key=lambda x: x[0]):
-                print(f"  {raw:<28s} ← \"{subj[:55]}\"  ({date[:10]})")
+                print(f"  {raw:<28s} <- \"{subj[:55]}\"  ({date[:10]})")
         else:
             print("  (none — run python3 pmfarm_gmail_sync.py to enable)")
     else:
@@ -1158,7 +1169,7 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
             ev_str = (f"\"{ev[2][:50]}\" ({ev[3][:10]})" if ev
                       else f"\"{j['company']}\" matched")
             print(f"  {j['company']:<24s} {j['title'][:45]}")
-            print(f"    ← {ev_str}")
+            print(f"    <- {ev_str}")
         if len(gmail_skipped) > 10:
             print(f"  … and {len(gmail_skipped) - 10} more")
 

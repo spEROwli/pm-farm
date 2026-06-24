@@ -26,10 +26,10 @@ through a dozen career sites.
 
 ## What it does
 
-- **Pulls from live sources** — primarily company ATS APIs (Greenhouse, Ashby, Lever)
-  with no auth required. The Muse runs keyless too. Adzuna and hiring.cafe (via Bright Data)
-  supplement when their API keys are configured as GitHub secrets — without them, those
-  sources stay inert. Every role on the live dashboard was returned by a real API call that morning.
+- **Pulls from live sources** — company ATS APIs (Greenhouse, Ashby, Lever, Workable)
+  with no auth required, plus hiring.cafe via Bright Data Web Unlocker for companies not
+  on those ATS platforms. Every role on the live dashboard was returned by a real API or
+  live scrape call that morning — no stale caches, no re-sold listings.
 - **Filters to a tight target profile:** Product Manager and Associate Product
   Manager only, NYC + SF + US-remote. Executive-layer titles (Director, VP, Head,
   Lead, Principal) are dropped at scrape time; "Senior" is kept since companies
@@ -52,9 +52,8 @@ pmfarm.py ── parallel ThreadPoolExecutor
     ├── Ashby       api.ashbyhq.com/posting-api/job-board/{slug}
     ├── Lever       api.lever.co/v0/postings/{slug}?mode=json
     ├── Workable    apply.workable.com/api/v3/accounts/{slug}/jobs
-    ├── Adzuna      api.adzuna.com/v1/api/jobs/us/search   (keyword search)
     ├── The Muse    themuse.com/api/public/jobs
-    └── hiring.cafe via Bright Data Web Unlocker           (optional)
+    └── hiring.cafe via Bright Data Web Unlocker
          │
          ▼
 filter: title (PM/APM only) · experience bar (regex from JD) · 72h freshness · location
@@ -141,9 +140,8 @@ deduplication, location classification, experience parsing, and output rendering
 | Ashby | `api.ashbyhq.com` | none |
 | Lever | `api.lever.co` | none |
 | Workable | `apply.workable.com` | none |
-| Adzuna | `api.adzuna.com` | app id/key |
 | The Muse | `themuse.com/api` | none |
-| hiring.cafe (optional) | via Bright Data Web Unlocker | API key |
+| hiring.cafe | via Bright Data Web Unlocker | API key (GitHub secret) |
 
 ## Stack
 

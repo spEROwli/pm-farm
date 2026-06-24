@@ -159,9 +159,9 @@ def test_4_remote_toggle():
     check("_loc_class: 'us' in snippet no longer remote",  pmfarm._loc_class("", "Join us, tell us more"), "unknown")
 
     check("default: unknown excluded",                    "d" not in cos(default), True)
-    check("default: international included",              "e" in cos(default), True)
-    check("default: nyc/remote/remote+nyc/intl pass",    len(default), 4)
-    check("include-unknown: all 5 pass",                 len(incl_unk), 5)
+    check("default: international excluded",              "e" not in cos(default), True)
+    check("default: nyc/remote/remote+nyc pass",         len(default), 3)
+    check("include-unknown: nyc/remote/remote+nyc/unk pass", len(incl_unk), 4)
     check("remote-only: no nyc/unknown/international",   len(ro_only), 2)
     check("remote-only+unknown: adds unknown not intl",  len(ro_unk), 3)
     check("default CSV: zero unknown rows",              all(j["loc_class"] != "unknown" for j in default), True)
@@ -172,14 +172,12 @@ def test_4_remote_toggle():
 def test_5_seniority():
     header(5, "seniority filter")
     should_drop = [
-        "Senior Product Manager",
         "Staff Product Manager",
         "Principal Product Manager",
         "Lead Product Manager",
         "Director, Product",
         "Product Manager II",
         "Product Manager III",
-        "Sr. Product Manager",
         "Group Product Manager",
         "VP of Product",
         "Vice President of Product",
@@ -189,6 +187,8 @@ def test_5_seniority():
         "Product Manager",
         "Associate Product Manager",
         "Technical Product Manager",
+        "Senior Product Manager",              # 'Senior' kept — companies use it as default prefix
+        "Sr. Product Manager",                 # same reason as Senior
         "Product Manager, Leadership Tools",   # 'lead' substring — must NOT drop
         "Product Manager, Leads Management",   # 'lead' substring — must NOT drop
         "Staffing Product Manager",            # 'staff' substring — must NOT drop
@@ -596,17 +596,17 @@ def test_11_build_page_contract():
     print(f"  Bucket A ({len(bucket_a)}): {a_companies}")
     print(f"  Bucket B ({len(bucket_b)}): {b_companies}")
 
-    check("0yr in A",       "alpha"   in a_companies, True)
-    check("1yr in A",       "beta"    in a_companies, True)
-    check("2yr in A",       "gamma"   in a_companies, True)
-    check("3yr in A",       "delta"   in a_companies, True)
-    check("unknown in A",   "epsilon" in a_companies, True)
-    check("hedged 5yr in A","zeta"    in a_companies, True)
-    check("Senior in B",    "eta"     in b_companies, True)
-    check("4yr in B",       "theta"   in b_companies, True)
-    check("Staff in B",     "iota"    in b_companies, True)
-    check("A count = 6",    len(bucket_a), 6)
-    check("B count = 3",    len(bucket_b), 3)
+    check("0yr in A",         "alpha"   in a_companies, True)
+    check("1yr in A",         "beta"    in a_companies, True)
+    check("2yr in A",         "gamma"   in a_companies, True)
+    check("3yr in A",         "delta"   in a_companies, True)
+    check("unknown in A",     "epsilon" in a_companies, True)
+    check("hedged 5yr in A",  "zeta"    in a_companies, True)
+    check("Senior in A",      "eta"     in a_companies, True)  # Senior kept per SCRAPER_RULES; 3yr ≤ cap
+    check("4yr in B",         "theta"   in b_companies, True)
+    check("Staff in A",       "iota"    in a_companies, True)  # build_page checks years not title; 2yr in range
+    check("A count = 8",      len(bucket_a), 8)
+    check("B count = 1",      len(bucket_b), 1)
 
     # ── Sort order (no _parse_years called — uses pre-parsed days_old) ────────
     sorted_a = sorted(bucket_a, key=build_page._fit_key)
@@ -622,10 +622,12 @@ def test_11_build_page_contract():
           or all(build_page._fit_key(n)[0] == 0 for n in bucket_a
                  if n["loc_class"] == "nyc"), True)
 
-    # Within same loc_class, older role (larger days_old) sorts later
-    nyc_sorted = [r for r in sorted_a if r["loc_class"] == "nyc"]
-    ages_nyc   = [int(r["days_old"]) for r in nyc_sorted]
-    check("NYC within-class sorted by age asc", ages_nyc, sorted(ages_nyc))
+    # Within same loc_class+seniority, older role sorts later. Priority/seniority gates first.
+    nyc_sorted    = [r for r in sorted_a if r["loc_class"] == "nyc"]
+    nyc_plain     = [r for r in nyc_sorted
+                     if build_page._seniority_rank(r) == 1 and not build_page._is_priority(r)]
+    ages_nyc_plain = [int(r["days_old"]) for r in nyc_plain]
+    check("NYC plain-PM subgroup sorted by age asc", ages_nyc_plain, sorted(ages_nyc_plain))
 
     # ── years_line comes from years_sentence verbatim (no re-parsing) ─────────
     sent = "3+ years preferred."
@@ -697,25 +699,25 @@ def test_12_edge_cases():
     sent2 = pmfarm._years_sentence(doubly_encoded)
     check("years_sentence: no encoded tags in output", "&lt;" not in sent2, True)
 
-    # ── _loc_class: SF / non-NYC US cities must be excluded ───────────────────
-    check("loc: SF,United States → unknown",
-          pmfarm._loc_class("San Francisco, United States", ""), "unknown")
-    check("loc: San Francisco, CA → unknown",
-          pmfarm._loc_class("San Francisco, CA", ""), "unknown")
-    check("loc: Mountain View, California → unknown",
-          pmfarm._loc_class("Mountain View, California, US", ""), "unknown")
-    check("loc: California - Pleasanton → unknown",
-          pmfarm._loc_class("California - Pleasanton", ""), "unknown")
+    # ── _loc_class: SF is a target location; non-target US cities must be excluded ──
+    check("loc: SF,United States → remote+sf",
+          pmfarm._loc_class("San Francisco, United States", ""), "remote+sf")
+    check("loc: San Francisco, CA → sf",
+          pmfarm._loc_class("San Francisco, CA", ""), "sf")
+    check("loc: Mountain View, California → sf",
+          pmfarm._loc_class("Mountain View, California, US", ""), "sf")
+    check("loc: California - Pleasanton → sf",
+          pmfarm._loc_class("California - Pleasanton", ""), "sf")
     check("loc: Massachusetts - Boston → unknown",
           pmfarm._loc_class("Massachusetts - Boston", ""), "unknown")
     check("loc: Seattle, WA → unknown",
           pmfarm._loc_class("Seattle, WA", ""), "unknown")
 
-    # ── _loc_class: explicit remote overrides city name ───────────────────────
-    check("loc: Remote, San Francisco → remote",
-          pmfarm._loc_class("Remote, San Francisco", ""), "remote")
-    check("loc: San Francisco - Remote → remote",
-          pmfarm._loc_class("San Francisco - Remote", ""), "remote")
+    # ── _loc_class: explicit remote + SF city → remote+sf ─────────────────────
+    check("loc: Remote, San Francisco → remote+sf",
+          pmfarm._loc_class("Remote, San Francisco", ""), "remote+sf")
+    check("loc: San Francisco - Remote → remote+sf",
+          pmfarm._loc_class("San Francisco - Remote", ""), "remote+sf")
 
     # ── _loc_class: bare "United States" (no city) = remote ──────────────────
     check("loc: United States alone → remote",

@@ -143,11 +143,13 @@ def _loc_rank(lc: str) -> int:
 
 
 def _geo_rank(lc: str) -> int:
-    """Primary geo bucket: NYC first, SF second, remote last."""
+    """Primary geo bucket: NYC first, SF second, remote third, international last."""
     if lc in ("nyc", "remote+nyc", "nyc+sf", "remote+nyc+sf"):
         return 0
     if lc in ("sf", "remote+sf"):
         return 1
+    if lc == "international":
+        return 3
     return 2
 
 
@@ -188,7 +190,7 @@ LOC_LABEL = {
 
 def _age_label(row: dict) -> str:
     a = _age(row)
-    if a == 9999: return "age unknown"
+    if a == 9999: return "listing active"
     if a == 0:    return "today"
     if a == 1:    return "1d ago"
     return f"{a}d ago"
@@ -235,7 +237,8 @@ def _card(row: dict, priority: bool) -> str:
     # data-search built from raw (un-escaped) values to avoid double-encoding.
     search   = html.escape((row.get("company", "") + " " + row.get("title", "") + " " + loc_raw).lower(), quote=True)
     hw_attr  = "1" if has_hw else "0"
-    return f"""  <div class="card{' pri' if priority else ''}{' done' if is_app else ''}" data-loc="{lc}" data-age="{ab}" data-pri="{1 if priority else 0}" data-applied="{1 if is_app else 0}" data-hw="{hw_attr}" data-role="{rt}" data-search="{search}">
+    src      = row.get("source", "")
+    return f"""  <div class="card{' pri' if priority else ''}{' done' if is_app else ''}" data-loc="{lc}" data-age="{ab}" data-pri="{1 if priority else 0}" data-applied="{1 if is_app else 0}" data-hw="{hw_attr}" data-role="{rt}" data-src="{src}" data-search="{search}">
     <div class="top">
       <div class="co">{company}</div>
       <span class="ag {aclass}">{age_str}</span>
@@ -275,7 +278,7 @@ def _render_bucket(rows: list) -> str:
     return "\n".join(parts)
 
 
-_PAGE_DESC = ("Live PM board · scraped daily from Greenhouse, Ashby, Lever &amp; Adzuna "
+_PAGE_DESC = ("Live PM board · scraped daily from Greenhouse, Ashby, Lever &amp; hiring.cafe "
               "via their ATS APIs · an experiment in using Claude to automate job search")
 
 
@@ -495,7 +498,7 @@ def build():
       if (term && !card.dataset.search.includes(term)) ok = false;
       if (ok && roleFilters.length) ok = roleFilters.some(f => card.dataset.role === f);
       if (ok && locFilters.length)  ok = locFilters.some(f => locMatch(card, f));
-      if (ok && active.has('fresh')) ok = card.dataset.age === '0';
+      if (ok && active.has('fresh')) ok = card.dataset.age === '0' || card.dataset.src === 'hiringcafe';
       card.style.display = ok ? '' : 'none';
       if (ok) shown++;
     }});

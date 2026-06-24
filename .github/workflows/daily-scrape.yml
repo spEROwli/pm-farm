@@ -46,9 +46,12 @@ jobs:
           BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_KEY }}
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+          PYTHONUTF8: "1"
         run: python3 pmfarm.py
 
       - name: Build HTML
+        env:
+          PYTHONUTF8: "1"
         run: python3 build_page.py
 
       - name: Commit and push if changed

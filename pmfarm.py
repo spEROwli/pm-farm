@@ -25,7 +25,7 @@ SOURCES = {
     "lever":      True,
     "workable":   True,
     "brightdata": True,
-    "adzuna":     True,
+    "adzuna":     False,  # redirect links go through adzuna.com, not the employer's page
     "muse":       True,
 }
 
@@ -117,8 +117,8 @@ def fetch_adzuna() -> list[dict]:
 _BRIGHTDATA_KEY_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "brightdata_key.txt")
 _BRIGHTDATA_RUN_STAMP    = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".brightdata_last_run")
 BRIGHTDATA_CLI           = os.environ.get("BRIGHTDATA_CLI", "bdata")          # CLI name or absolute path
-BRIGHTDATA_UNLOCKER_ZONE = os.environ.get("BRIGHTDATA_UNLOCKER_ZONE", "cli_unlocker")  # auto-created by `bdata login`
-BRIGHTDATA_MIN_HOURS     = 0    # spend lock DISABLED — hiring.cafe is ~$0.006/run (4 pages); MAX_PAGE_LOADS is the real ceiling
+BRIGHTDATA_UNLOCKER_ZONE = os.environ.get("BRIGHTDATA_UNLOCKER_ZONE", "web_unlocker1")
+BRIGHTDATA_MIN_HOURS     = 12   # once-per-12h spend lock; blocks accidental manual re-runs from double-billing
 
 # hiring.cafe URLs are generated as /jobs/<role-slug>/locations/<geo-slug>. Changing
 # coverage = editing these two lists (parametric). Verified geo slugs: "new-york"
@@ -874,7 +874,7 @@ def _hiringcafe_job(h: dict) -> dict | None:
     company  = (v5.get("company_name")
                 or (h.get("enriched_company_data") or {}).get("name") or "(unknown)")
     location = v5.get("formatted_workplace_location") or ""
-    date_str = v5.get("estimated_publish_date") or None
+    date_str = None  # estimated_publish_date reflects original post date, not last-active; treat like Ashby (no reliable date)
     parts: list[str] = []
     yoe = v5.get("min_industry_and_role_yoe")
     if not v5.get("is_min_industry_and_role_yoe_not_mentioned") and yoe is not None:
@@ -929,6 +929,10 @@ def fetch_brightdata() -> list[dict]:
     for url in urls:
         try:
             html = _bd_fetch_html(url, api_key)
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")[:200]
+            print(f"  [brightdata] HTTP {e.code} (zone='{BRIGHTDATA_UNLOCKER_ZONE}'): {body}", file=sys.stderr)
+            continue
         except Exception as e:
             print(f"  [brightdata] fetch failed ({url}): {e}", file=sys.stderr)
             continue
@@ -944,7 +948,7 @@ def fetch_brightdata() -> list[dict]:
             if j:
                 out.append(j)
 
-    print(f"  fetch_brightdata: {pages_ok}/{len(urls)} hiring.cafe pages → "
+    print(f"  fetch_brightdata: {pages_ok}/{len(urls)} hiring.cafe pages -> "
           f"{len(out)} matched title filter")
     return out
 
@@ -1163,9 +1167,9 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
     nyc_count    = sum(1 for j in filtered if j["loc_class"] in _NYC_CLASSES)
     sf_count     = sum(1 for j in filtered if j["loc_class"] in _SF_CLASSES)
     remote_count = sum(1 for j in filtered if "remote" in j["loc_class"])
-    print(f"\n{len(raw)} title-matched → {len(filtered)} after location "
+    print(f"\n{len(raw)} title-matched -> {len(filtered)} after location "
           f"(NYC={nyc_count} SF={sf_count} remote={remote_count} excluded-unknown={excluded_unknown}) "
-          f"→ {len(url_deduped)} after URL-dedupe → {len(jobs)} after Gmail-dedupe")
+          f"-> {len(url_deduped)} after URL-dedupe -> {len(jobs)} after Gmail-dedupe")
     if skipped_url:
         print(f"(also skipped {skipped_url} by applied.csv URL/name match)")
     if excluded_unknown and not include_unknown_loc:

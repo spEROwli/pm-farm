@@ -807,6 +807,63 @@ def test_12_edge_cases():
     check("partial cache: lever falls back to default", len(_lev) > 5, True)
 
 
+# ── TEST 13: Brightdata / hiring.cafe parse path ─────────────────────────────
+
+def test_13_brightdata_parse():
+    header(13, "brightdata hiring.cafe parse path")
+
+    def _make_hit(title="Product Manager", apply_url="https://apply.example.com/123",
+                  company="Acme Corp", location="New York, NY",
+                  yoe=2, yoe_not_mentioned=False, reqs="2+ years of product experience"):
+        return {
+            "apply_url": apply_url,
+            "job_information": {"title": title},
+            "enriched_company_data": {"name": company},
+            "v5_processed_job_data": {
+                "company_name": company,
+                "core_job_title": title,
+                "formatted_workplace_location": location,
+                "estimated_publish_date": "2026-06-20T00:00:00.000Z",
+                "min_industry_and_role_yoe": yoe,
+                "is_min_industry_and_role_yoe_not_mentioned": yoe_not_mentioned,
+                "requirements_summary": reqs,
+            },
+        }
+
+    # Happy path: well-formed hit produces a valid job dict
+    j = pmfarm._hiringcafe_job(_make_hit())
+    check("BD-1 happy path: not None",           j is not None,       True)
+    check("BD-1 source",                          j["source"],         "hiring.cafe")
+    check("BD-1 company",                         j["company"],        "Acme Corp")
+    check("BD-1 title",                           j["title"],          "Product Manager")
+    check("BD-1 url",                             j["url"],            "https://apply.example.com/123")
+    check("BD-1 days_old unknown (no date used)", j["days_old"],       "unknown")
+    check("BD-1 years_raw parsed from yoe",       j["years_raw"],      "2")
+
+    # Missing apply_url -> returns None (filtered out)
+    j2 = pmfarm._hiringcafe_job(_make_hit(apply_url=""))
+    check("BD-2 missing apply_url -> None",       j2,                  None)
+
+    # Title fails gate -> returns None
+    j3 = pmfarm._hiringcafe_job(_make_hit(title="Marketing Manager"))
+    check("BD-3 bad title -> None",               j3,                  None)
+
+    # is_yoe_not_mentioned=True -> no yoe injected -> years_raw=unknown
+    j4 = pmfarm._hiringcafe_job(_make_hit(yoe=8, yoe_not_mentioned=True, reqs=""))
+    check("BD-4 yoe not mentioned -> unknown",    j4["years_raw"],     "unknown")
+
+    # Malformed __NEXT_DATA__ JSON -> _hiringcafe_hits returns []
+    bad_html = '<script id="__NEXT_DATA__">{not valid json}</script>'
+    check("BD-5 malformed JSON -> empty list",    pmfarm._hiringcafe_hits(bad_html), [])
+
+    # No __NEXT_DATA__ script at all -> []
+    check("BD-6 no script tag -> empty list",     pmfarm._hiringcafe_hits("<html></html>"), [])
+
+    # ssrHits missing from valid JSON -> []
+    no_hits_html = '<script id="__NEXT_DATA__">{"props":{"pageProps":{}}}</script>'
+    check("BD-7 ssrHits missing -> empty list",   pmfarm._hiringcafe_hits(no_hits_html), [])
+
+
 # ── run all ───────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -822,13 +879,14 @@ if __name__ == "__main__":
     test_10_slug_resolution()
     test_11_build_page_contract()
     test_12_edge_cases()
+    test_13_brightdata_parse()
 
     n_fail = sum(1 for r in results if r[0] == FAIL)
-    print(f"\n{'═'*68}")
+    print(f"\n{'='*68}")
     for status, name, got, want in results:
         if status == FAIL:
             print(f"  FAIL  {name}\n        got={got}\n        want={want}")
     print(f"  {len(results) - n_fail}/{len(results)} checks passed"
-          + (f"  ← {n_fail} FAILED" if n_fail else "  ✓ all green"))
-    print(f"{'═'*68}")
+          + (f"  <- {n_fail} FAILED" if n_fail else "  all green"))
+    print(f"{'='*68}")
     raise SystemExit(1 if n_fail else 0)

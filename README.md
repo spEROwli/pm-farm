@@ -27,9 +27,10 @@ through a dozen career sites.
 ## What it does
 
 - **Pulls from live sources** — company ATS APIs (Greenhouse, Ashby, Lever, Workable)
-  with no auth required, plus hiring.cafe via Bright Data Web Unlocker for companies not
-  on those ATS platforms. Every role on the live dashboard was returned by a real API or
-  live scrape call that morning — no stale caches, no re-sold listings.
+  with no auth required, plus hiring.cafe, YC Jobs, and Wellfound via Bright Data
+  Web Unlocker for the startup roles that never touch those ATS platforms. Every role
+  on the live dashboard was returned by a real API or live scrape call that morning —
+  no stale caches, no re-sold listings.
 - **Filters to a tight target profile:** Product Manager and Associate Product
   Manager only, NYC + SF + US-remote. Executive-layer titles (Director, VP, Head,
   Lead, Principal) are dropped at scrape time; "Senior" is kept since companies
@@ -53,7 +54,9 @@ pmfarm.py ── parallel ThreadPoolExecutor
     ├── Lever       api.lever.co/v0/postings/{slug}?mode=json
     ├── Workable    apply.workable.com/api/v3/accounts/{slug}/jobs
     ├── The Muse    themuse.com/api/public/jobs
-    └── hiring.cafe via Bright Data Web Unlocker
+    ├── hiring.cafe via Bright Data Web Unlocker  (role-slug pages, NYC + SF)
+    ├── YC Jobs     ycombinator.com/jobs/role/product-manager  (Web Unlocker)
+    └── Wellfound   wellfound.com/role/l/product-manager/{geo}  (Web Unlocker)
          │
          ▼
 filter: title (PM/APM only) · experience bar (regex from JD) · 72h freshness · location
@@ -74,10 +77,11 @@ chain and commits the outputs back to `main` each morning.
 **Direct ATS access as the backbone, search APIs for breadth.** The curated
 ~95 companies are hit directly through their public Greenhouse/Ashby/Lever/Workable
 JSON (no auth, typically <100ms/request) — those are the companies I most want to
-work at. Adzuna, The Muse, and hiring.cafe then widen coverage to any company
-posting a matching role, so the list isn't capped at the curated set. Everything
-flows through the same title/experience/freshness gate, so a role from a search
-API is held to the exact same bar as a direct ATS hit.
+work at. The Muse, hiring.cafe, YC Jobs, and Wellfound then widen coverage to any
+company posting a matching role — including early-stage startups that recruit only
+through YC/Wellfound and never appear in a traditional ATS. Everything flows through
+the same title/experience/freshness gate, so a role from a scrape is held to the
+exact same bar as a direct ATS hit.
 
 **Pure standard library.** `urllib`, `csv`, `sqlite3`, `re`, `ThreadPoolExecutor`
 — no requests, no BeautifulSoup, no pandas. Zero third-party dependencies.
@@ -129,8 +133,8 @@ The company list lives in `verified_companies.json` (committed) and `companies.d
 python3 -m pytest test_pmfarm.py -v
 ```
 
-12 test groups (105 assertions) covering title/seniority filtering,
-deduplication, location classification, experience parsing, and output rendering.
+13 test groups covering title/seniority filtering, deduplication, location
+classification, experience parsing, Bright Data HTML parsing, and output rendering.
 
 ## Data sources
 
@@ -142,6 +146,8 @@ deduplication, location classification, experience parsing, and output rendering
 | Workable | `apply.workable.com` | none |
 | The Muse | `themuse.com/api` | none |
 | hiring.cafe | via Bright Data Web Unlocker | API key (GitHub secret) |
+| YC Jobs | `ycombinator.com/jobs` via Bright Data Web Unlocker | API key (GitHub secret) |
+| Wellfound | `wellfound.com/role/l` via Bright Data Web Unlocker | API key (GitHub secret) |
 
 ## Stack
 

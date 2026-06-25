@@ -25,6 +25,8 @@ SOURCES = {
     "lever":      True,
     "workable":   True,
     "brightdata": True,
+    "yc":         True,   # ycombinator.com/jobs — startup PM roles, Web Unlocker
+    "wellfound":  True,   # wellfound.com — startup PM roles, Web Unlocker
     "adzuna":     False,  # redirect links go through adzuna.com, not the employer's page
     "muse":       True,
 }
@@ -111,12 +113,11 @@ def fetch_adzuna() -> list[dict]:
 # ── Bright Data / hiring.cafe (gitignored key, same pattern as Adzuna) ─────────
 # brightdata_key.txt holds ONE line: the Bright Data API key. hiring.cafe is JS-gated
 # and unreachable by the urllib fetchers; we pull its robots-ALLOWED /jobs/<role>/
-# locations/<geo> result pages via `bdata scrape` (Web Unlocker renders the JS) and
+# locations/<geo> result pages via the Web Unlocker REST API (renders the JS) and
 # parse the embedded __NEXT_DATA__ ssrHits JSON — no paid Scraper Studio collector,
 # just cheap Web Unlocker requests (~$1.50 / 1k). Absent/blank key → fetch is inert.
 _BRIGHTDATA_KEY_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "brightdata_key.txt")
 _BRIGHTDATA_RUN_STAMP    = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".brightdata_last_run")
-BRIGHTDATA_CLI           = os.environ.get("BRIGHTDATA_CLI", "bdata")          # CLI name or absolute path
 BRIGHTDATA_UNLOCKER_ZONE = os.environ.get("BRIGHTDATA_UNLOCKER_ZONE", "web_unlocker1")
 BRIGHTDATA_MIN_HOURS     = 2    # 2h cooldown; MAX_PAGE_LOADS=30 is the real cost ceiling (~$0.045 max/run)
 
@@ -125,12 +126,32 @@ BRIGHTDATA_MIN_HOURS     = 2    # 2h cooldown; MAX_PAGE_LOADS=30 is the real cos
 # (NYC, primary) and "san-francisco-ca" (SF — confirmed live, 20 hits; note plain
 # "san-francisco"/"sf"/"san-francisco-bay-area" all 404 to a generic page).
 # MAX_PAGE_LOADS caps total pages fetched per run as the hard spend ceiling
-# (9 roles × 2 geos = 18 URLs, under the cap).
+# (3 roles × 2 geos = 6 URLs, well under the cap).
+# Note: hiring.cafe only serves page 1 on slug URLs; ?page=N is robots.txt-blocked.
 HIRINGCAFE_ROLE_SLUGS = [
-    "product-manager", "associate-product-manager",
+    "product-manager", "associate-product-manager", "senior-product-manager",
 ]
 HIRINGCAFE_GEO_SLUGS = ["new-york", "san-francisco-ca"]
 MAX_PAGE_LOADS       = 30   # hard cap on hiring.cafe page fetches per run (cost ceiling)
+
+# ── YC Jobs (ycombinator.com/jobs) ────────────────────────────────────────────
+# ycombinator.com /jobs/role/product-manager is publicly accessible via Web Unlocker
+# and returns ~30 PM-specific listings globally. The /new-york and /san-francisco
+# sub-paths return all recent jobs for those cities (all roles mixed); we title-filter.
+# No spend lock needed — 3 requests at ~$0.0015 each is negligible.
+YC_JOBS_URLS = [
+    "https://www.ycombinator.com/jobs/role/product-manager",
+    "https://www.ycombinator.com/jobs/role/product-manager/new-york",
+    "https://www.ycombinator.com/jobs/role/product-manager/san-francisco",
+]
+
+# ── Wellfound (wellfound.com) ──────────────────────────────────────────────────
+# Startup-focused job board. Page 1 = ~50 PM listings per geo. Paginates via
+# ?page=N (robots.txt-blocked), so we get one page per URL.
+WELLFOUND_URLS = [
+    "https://wellfound.com/role/l/product-manager/new-york",
+    "https://wellfound.com/role/l/product-manager/san-francisco",
+]
 
 
 def _load_brightdata_key() -> str | None:
@@ -569,6 +590,22 @@ def _days_old(date_str: str | None) -> str:
         return "unknown"
 
 
+def _relative_date(text: str) -> str | None:
+    """Convert 'X days ago', 'yesterday', 'about X hours ago' → ISO date string."""
+    t = (text or "").lower().strip()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if not t or "just now" in t or "hour" in t or "minute" in t:
+        return now.isoformat()
+    if "yesterday" in t:
+        return (now - datetime.timedelta(days=1)).isoformat()
+    m = re.search(r"(\d+)\s*(day|week|month|year)", t)
+    if not m:
+        return None
+    n, unit = int(m.group(1)), m.group(2)
+    days = {"day": n, "week": n * 7, "month": n * 30, "year": n * 365}[unit]
+    return (now - datetime.timedelta(days=days)).isoformat()
+
+
 def _passes_title(title: str) -> bool:
     t = title.lower()
     if not any(kw in t for kw in TITLE_MUST_INCLUDE):
@@ -964,6 +1001,267 @@ def fetch_brightdata() -> list[dict]:
     return out
 
 
+# ── YC Jobs (ycombinator.com) ─────────────────────────────────────────────────
+
+def _yc_parse(html: str) -> list[dict]:
+    """
+    Parse YC job listings from a rendered page. Tries __NEXT_DATA__ first,
+    then falls back to regex on visible HTML text.
+    Returns list of dicts: {title, company, location, url, date_str}.
+    """
+    # ── attempt 1: __NEXT_DATA__ (Next.js SSR) ──
+    nd_m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.DOTALL)
+    if nd_m:
+        try:
+            nd = json.loads(nd_m.group(1))
+            pp = nd.get("props", {}).get("pageProps", {})
+            for path in [["jobs"], ["jobPostings"], ["listings"], ["data", "jobs"],
+                         ["initialData", "jobs"]]:
+                obj = pp
+                for key in path:
+                    if isinstance(obj, dict):
+                        obj = obj.get(key)
+                if isinstance(obj, list) and obj:
+                    # Structural probe: log shape so we can refine if needed
+                    print(f"  [yc] __NEXT_DATA__.pageProps.{'.'.join(path)}: {len(obj)} items "
+                          f"(keys: {list(obj[0].keys()) if isinstance(obj[0], dict) else '?'})",
+                          file=sys.stderr)
+                    return []  # placeholder — refine once we see the shape
+            print(f"  [yc] __NEXT_DATA__ pageProps keys: {list(pp.keys())} — using HTML fallback",
+                  file=sys.stderr)
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+    # ── attempt 2: regex on rendered HTML ──
+    # Job anchors: href="/companies/{co}/jobs/{id}-{slug}">Title</a>
+    job_re = re.compile(
+        r'href="/companies/([^/]+)/jobs/([A-Za-z0-9]+-[^"]+)"[^>]*>\s*([^<\n]+?)\s*</a>',
+        re.IGNORECASE,
+    )
+    # Company anchors: href="/companies/{co}">Name (WXX) • desc...</a>
+    co_re = re.compile(
+        r'href="/companies/([^/"+]+)"[^>]*>\s*(?:<[^>]+>)*\s*([^<(•·\n]{2,60})',
+        re.IGNORECASE,
+    )
+
+    jobs: list[dict] = []
+    html_pos = 0
+    co_name_map: dict[str, str] = {}
+
+    # Build slug→name map first pass
+    for cm in co_re.finditer(html):
+        slug, name = cm.group(1), cm.group(2).strip()
+        if name and slug not in co_name_map:
+            co_name_map[slug] = name
+
+    for m in job_re.finditer(html):
+        co_slug, id_slug, title = m.group(1), m.group(2), m.group(3).strip()
+        if not title or len(title) < 3:
+            continue
+        url = f"https://www.ycombinator.com/companies/{co_slug}/jobs/{id_slug}"
+        company = co_name_map.get(co_slug, co_slug.replace("-", " ").title())
+
+        # Find location + date in next 600 chars (strip tags → plain text → parse bullets)
+        window_html = html[m.end():m.end() + 600]
+        window = re.sub(r"<[^>]+>", " ", window_html)
+        window = re.sub(r"\s+", " ", window).strip()
+
+        # Location: after "Full-time • Dept •" pattern, last bullet-item (before date)
+        loc, date_str = "", None
+        ft_idx = window.lower().find("full-time")
+        if ft_idx >= 0:
+            meta = window[ft_idx:]
+            parts = [p.strip() for p in re.split(r"[•·]", meta) if p.strip()]
+            # parts: ["Full-time", "Product", "$salary", "City, ST, US / City2"]
+            # location = last non-empty, non-salary, non-UI part
+            _SKIP = {"apply", "save", "mark applied", "hide"}
+            for p in reversed(parts):
+                if re.match(r"^\$", p) or p.lower().startswith("full"):
+                    continue
+                if p.lower() in _SKIP or len(p) <= 2:
+                    continue
+                # Strip any residual HTML tags/entities that leaked through
+                p_clean = re.sub(r"<[^>]*>", "", p)
+                p_clean = re.sub(r"&\w+;|&#\d+;", "", p_clean).strip()
+                # Truncate at first < (safety net for dangling open tag)
+                if "<" in p_clean:
+                    p_clean = p_clean[:p_clean.index("<")].strip()
+                if p_clean and len(p_clean) > 2:
+                    loc = p_clean
+                    break
+
+        # Date: look for relative time in window
+        date_m = re.search(r"(about\s+)?(\d+)\s*(hour|day|week|month|year)s?\s*ago|yesterday",
+                            window, re.IGNORECASE)
+        if date_m:
+            date_str = _relative_date(date_m.group(0))
+
+        jobs.append({"title": title, "company": company, "location": loc,
+                     "url": url, "date_str": date_str})
+    return jobs
+
+
+def fetch_yc() -> list[dict]:
+    if not SOURCES.get("yc"):
+        return []
+    api_key = _load_brightdata_key()
+    if not api_key:
+        print("  [yc] inert: no Brightdata API key", file=sys.stderr)
+        return []
+
+    out: list[dict] = []
+    pages_ok = 0
+    for url in YC_JOBS_URLS:
+        try:
+            html = _bd_fetch_html(url, api_key)
+        except Exception as e:
+            print(f"  [yc] fetch failed ({url}): {e}", file=sys.stderr)
+            continue
+        pages_ok += 1
+        for j in _yc_parse(html):
+            if not _passes_title(j["title"]):
+                continue
+            job = _make_job("yc", j["company"], j["title"], j["location"],
+                            j["url"], j["title"], j["date_str"])
+            out.append(job)
+
+    # Dedupe by URL (same job may appear on both global and city-specific pages)
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for j in out:
+        if j["url"] not in seen:
+            seen.add(j["url"])
+            deduped.append(j)
+
+    print(f"  fetch_yc: {pages_ok}/{len(YC_JOBS_URLS)} YC pages -> {len(deduped)} after title filter+dedupe")
+    return deduped
+
+
+# ── Wellfound ─────────────────────────────────────────────────────────────────
+
+_WF_URL_LOC = {
+    "new-york":       "New York, NY",
+    "san-francisco":  "San Francisco, CA",
+}
+
+def _wellfound_parse(html: str, page_url: str = "") -> list[dict]:
+    """
+    Parse Wellfound PM job listings via HTML regex (Wellfound renders jobs client-side
+    via GraphQL so __NEXT_DATA__ apolloState is empty). Infers location from page_url
+    when not found in the job context window.
+    Returns list of dicts: {title, company, location, url, date_str, exp_text, salary_text}.
+    """
+    # Infer geo from URL slug (e.g. "new-york", "san-francisco")
+    url_geo = ""
+    for slug, geo in _WF_URL_LOC.items():
+        if slug in page_url:
+            url_geo = geo
+            break
+
+    job_re = re.compile(
+        r'href="/jobs/(\d+)(-[^"]*)?"\s*[^>]*>\s*([^<\n]+?)\s*</a>',
+        re.IGNORECASE,
+    )
+    co_re = re.compile(
+        r'href="/company/([^"/]+)"[^>]*>\s*(?:<[^>]+>)*\s*([^<\n]{2,80})',
+        re.IGNORECASE,
+    )
+    SALARY_RE = re.compile(r"\$[\d,]+[kK]?\s*[–\-]\s*\$[\d,]+[kK]?", re.IGNORECASE)
+    EXP_RE    = re.compile(r"(\d+)\s*years?\s*of\s*exp", re.IGNORECASE)
+    DATE_RE   = re.compile(r"(about\s+)?(\d+)\s*(day|week|month|year)s?\s*ago|yesterday",
+                           re.IGNORECASE)
+    LOC_RE    = re.compile(r"\b(new york|san francisco|remote|united states)\b", re.IGNORECASE)
+
+    co_positions: list[tuple[int, str, str]] = []
+    for cm in co_re.finditer(html):
+        co_positions.append((cm.start(), cm.group(1), cm.group(2).strip()))
+
+    jobs: list[dict] = []
+    for m in job_re.finditer(html):
+        job_id, _slug, title = m.group(1), m.group(2) or "", m.group(3).strip()
+        if not title or len(title) < 3:
+            continue
+        url = f"https://wellfound.com/jobs/{job_id}{_slug}"
+
+        pos = m.start()
+        company = ""
+        for cpos, _cslug, cname in reversed(co_positions):
+            if cpos < pos:
+                company = cname
+                break
+
+        window_html = html[pos:pos + 800]
+        window = re.sub(r"<[^>]+>", " ", window_html)
+        window = re.sub(r"\s+", " ", window).strip()
+
+        sal_m = SALARY_RE.search(window)
+        salary_text = sal_m.group(0) if sal_m else ""
+
+        exp_m = EXP_RE.search(window)
+        exp_text = exp_m.group(0) if exp_m else ""
+
+        date_m = DATE_RE.search(window)
+        date_str = _relative_date(date_m.group(0)) if date_m else None
+
+        loc = ""
+        for part in re.split(r"\n|•|·", window):
+            part = part.strip()
+            if (len(part) < 3 or SALARY_RE.match(part) or DATE_RE.match(part)
+                    or EXP_RE.search(part)
+                    or part.lower() in ("full-time", "part-time", "contract",
+                                        "internship", "save", "apply")):
+                continue
+            if LOC_RE.search(part):
+                loc = part
+                break
+        if not loc:
+            loc = url_geo  # fall back to URL-inferred geo
+
+        jobs.append({"title": title, "company": company, "location": loc,
+                     "url": url, "date_str": date_str,
+                     "exp_text": exp_text, "salary_text": salary_text})
+
+    print(f"  [wellfound] HTML regex: {len(jobs)} jobs from {page_url}", file=sys.stderr)
+    return jobs
+
+
+def fetch_wellfound() -> list[dict]:
+    if not SOURCES.get("wellfound"):
+        return []
+    api_key = _load_brightdata_key()
+    if not api_key:
+        print("  [wellfound] inert: no Brightdata API key", file=sys.stderr)
+        return []
+
+    out: list[dict] = []
+    pages_ok = 0
+    for url in WELLFOUND_URLS:
+        try:
+            html = _bd_fetch_html(url, api_key)
+        except Exception as e:
+            print(f"  [wellfound] fetch failed ({url}): {e}", file=sys.stderr)
+            continue
+        pages_ok += 1
+        for j in _wellfound_parse(html, url):
+            if not _passes_title(j["title"]):
+                continue
+            # Include exp + salary text in snippet so _parse_years can gate on it
+            snippet = " ".join(filter(None, [j["exp_text"], j["salary_text"], j["title"]]))
+            job = _make_job("wellfound", j["company"], j["title"], j["location"],
+                            j["url"], snippet, j["date_str"])
+            out.append(job)
+
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for j in out:
+        if j["url"] not in seen:
+            seen.add(j["url"])
+            deduped.append(j)
+
+    print(f"  fetch_wellfound: {pages_ok}/{len(WELLFOUND_URLS)} Wellfound pages -> {len(deduped)} after title filter+dedupe")
+    return deduped
+
+
 # ── output ─────────────────────────────────────────────────────────────────────
 
 def _sort_key(j: dict) -> tuple:
@@ -1077,6 +1375,20 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
             raw.extend(fetch_brightdata())
         except Exception as e:
             print(f"  [brightdata] FAILED: {e}", file=sys.stderr)
+
+    # ── YC Jobs (ycombinator.com) ─────────────────────────────────────────────
+    if SOURCES.get("yc"):
+        try:
+            raw.extend(fetch_yc())
+        except Exception as e:
+            print(f"  [yc] FAILED: {e}", file=sys.stderr)
+
+    # ── Wellfound ─────────────────────────────────────────────────────────────
+    if SOURCES.get("wellfound"):
+        try:
+            raw.extend(fetch_wellfound())
+        except Exception as e:
+            print(f"  [wellfound] FAILED: {e}", file=sys.stderr)
 
     # ── ATS-DIRECT ONLY ──────────────────────────────────────────────────────
     # Every role comes from Greenhouse/Ashby/Lever (and, once enabled, hiring.cafe

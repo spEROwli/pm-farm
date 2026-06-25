@@ -105,6 +105,7 @@ nothing across several runs are pruned automatically.
 ```bash
 python3 pmfarm.py         # scrape → pm_roles.csv
 python3 build_page.py     # render → pm_roles.html
+python3 add_company.py "Acme Corp"   # probe a single company and add it to verified_companies.json
 ```
 
 Automated runs are handled by GitHub Actions

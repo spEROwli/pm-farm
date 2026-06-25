@@ -20,9 +20,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install google-api-python-client google-auth-oauthlib
-
       - name: Expand company list (YC directory)
         run: python3 discover.py
         continue-on-error: true

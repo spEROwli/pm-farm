@@ -1,7 +1,7 @@
 {
   "_meta": {
     "description": "Verified ATS slug cache. Each entry has a confirmed job board URL. Used by pmfarm.py and discover.py to avoid slug-guessing on every run.",
-    "last_updated": "2026-06-23",
+    "last_updated": "2026-06-25",
     "total": 141
   },
   "greenhouse": [
@@ -713,6 +713,12 @@
     {
       "slug": "workato",
       "name": "Workato",
+      "tags": [],
+      "source": "adzuna-discover"
+    },
+    {
+      "slug": "lgelectronics",
+      "name": "LG Electronics",
       "tags": [],
       "source": "adzuna-discover"
     }

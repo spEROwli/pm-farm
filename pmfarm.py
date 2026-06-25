@@ -119,7 +119,7 @@ def fetch_adzuna() -> list[dict]:
 _BRIGHTDATA_KEY_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "brightdata_key.txt")
 _BRIGHTDATA_RUN_STAMP    = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".brightdata_last_run")
 BRIGHTDATA_UNLOCKER_ZONE = os.environ.get("BRIGHTDATA_UNLOCKER_ZONE", "web_unlocker1")
-BRIGHTDATA_MIN_HOURS     = 2    # 2h cooldown; MAX_PAGE_LOADS=30 is the real cost ceiling (~$0.045 max/run)
+BRIGHTDATA_MIN_HOURS     = 0    # spend lock OFF (0 = no cooldown); MAX_PAGE_LOADS=30 caps cost (~$0.045 max/run)
 
 # hiring.cafe URLs are generated as /jobs/<role-slug>/locations/<geo-slug>. Changing
 # coverage = editing these two lists (parametric). Verified geo slugs: "new-york"
@@ -887,7 +887,10 @@ def fetch_muse() -> list[dict]:
 
 def _bd_recent_run() -> bool:
     """True if a paid brightdata run completed < BRIGHTDATA_MIN_HOURS ago. Backs the
-    once-per-day spend lock so a manual re-run cannot trigger repeated paid scrapes."""
+    spend lock so a manual re-run cannot trigger repeated paid scrapes.
+    BRIGHTDATA_MIN_HOURS = 0 disables the lock entirely (always re-run)."""
+    if BRIGHTDATA_MIN_HOURS <= 0:
+        return False
     try:
         ts = float(open(_BRIGHTDATA_RUN_STAMP).read().strip())
         return (datetime.datetime.now().timestamp() - ts) < BRIGHTDATA_MIN_HOURS * 3600
@@ -1121,8 +1124,11 @@ def fetch_yc() -> list[dict]:
         for j in _yc_parse(html):
             if not _passes_title(j["title"]):
                 continue
+            # YC's board only lists currently-open roles and exposes no post date;
+            # treat the fetch date as the post date (same convention as hiring.cafe).
+            date_str = j["date_str"] or datetime.datetime.now(datetime.timezone.utc).isoformat()
             job = _make_job("yc", j["company"], j["title"], j["location"],
-                            j["url"], j["title"], j["date_str"])
+                            j["url"], j["title"], date_str)
             out.append(job)
 
     # Dedupe by URL (same job may appear on both global and city-specific pages)
@@ -1247,8 +1253,11 @@ def fetch_wellfound() -> list[dict]:
                 continue
             # Include exp + salary text in snippet so _parse_years can gate on it
             snippet = " ".join(filter(None, [j["exp_text"], j["salary_text"], j["title"]]))
+            # Wellfound list pages only show open roles and rarely expose a post date;
+            # fall back to the fetch date (same convention as hiring.cafe).
+            date_str = j["date_str"] or datetime.datetime.now(datetime.timezone.utc).isoformat()
             job = _make_job("wellfound", j["company"], j["title"], j["location"],
-                            j["url"], snippet, j["date_str"])
+                            j["url"], snippet, date_str)
             out.append(job)
 
     seen: set[str] = set()

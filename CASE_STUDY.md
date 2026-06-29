@@ -2,15 +2,19 @@
 
 ## One-line summary
 
-PM Farm is a live job-search intelligence tool that started as a technical learning project and evolved into a focused daily triage workflow for Product Manager candidates.
+PM Farm is a live PM job-search triage tool that started as a technical learning project and evolved into a focused daily decision-support workflow for Product Manager candidates.
 
 ## Origin
 
-I started PM Farm because I wanted to learn practical AI-assisted software development: working with APIs, scraping job sources, automating runs, and publishing a usable page. The first version was solution-led. I was asking, "Can I build this?" before I had fully sharpened the user problem.
+PM Farm started as a technical learning project. I wanted to learn APIs, scraping, automation, GitHub Actions, and AI-assisted coding by building something useful.
 
-That was the important lesson. As I used the tool, I realized the product opportunity was not to outcompete mature search platforms. Tools like Hiring Cafe are broader, faster, and more polished. The better product question was narrower:
+The first version was solution-led. I started with the solution before clearly defining the requirements or the user workflow. That led to unnecessary complexity, inefficient planning, and some overbuilding.
 
-> What would make my own daily PM job-search triage faster, more reliable, and easier to act on?
+As I used the tool, the useful shift was asking what decision the user actually needed to make. The answer was not “show every possible PM job.” Tools like Hiring Cafe already do broad search better. The answer was narrower:
+
+> Help me quickly decide which fresh PM roles deserve action today.
+
+That reframed PM Farm from a broad job-search idea into a daily triage workflow.
 
 ## Problem
 
@@ -31,7 +35,7 @@ The initial user was a PM candidate targeting a narrow role profile:
 
 Build a lightweight tool that answers one question:
 
-> What PM roles are fresh enough and relevant enough that I should act on them today?
+> What PM roles are fresh enough and relevant enough that I should apply to, research, or pursue through warm outreach today?
 
 ## MVP scope
 
@@ -39,32 +43,33 @@ The MVP focused on speed, reliability, and actionability:
 
 - Pull job data from hiring sources.
 - Filter for PM-track roles.
-- Remove stale or irrelevant roles.
+- Prioritize fresh postings over complete coverage.
 - Deduplicate repeated listings.
-- Publish a static dashboard.
+- Preserve source fidelity instead of guessing missing details.
+- Publish a lightweight static dashboard.
 - Refresh automatically through GitHub Actions.
 
 ## Key product decisions
 
 ### 1. Reframe the project from technical exploration to user workflow
 
-The original motivation was learning. The product discipline came from narrowing the project around a real workflow: daily role triage. That shift changed the success criteria from "more scraping" to "faster decision-making."
+The original motivation was learning. The product discipline came from admitting the first version was solution-led, then narrowing the project around a real workflow: daily role triage. That shift changed the success criteria from “more scraping” to “faster decision-making.”
 
 ### 2. Freshness over completeness
 
-A large stale list is not useful in a fast job search. PM Farm prioritizes recent postings so the user can focus on roles where timing still creates an advantage.
+A large stale list is not useful in a fast job search. Freshness mattered more than completeness because recent roles are more actionable than broad, stale coverage.
 
-### 3. Direct sources before generic aggregation
+### 3. Source fidelity over polished guessing
 
-The tool favors hiring-system data and live sources over recycled listings. This improves confidence that a role is real and currently actionable.
+The tool avoids inventing missing fields. If the source does not state a location, salary, URL, or experience requirement, the dashboard should not infer one. Source fidelity mattered more than making the output look complete.
 
-### 4. Simple interface before complex workflow
+### 4. Deduplication before adding more sources
 
-The dashboard stays intentionally lightweight. The goal is not to become a full CRM. The goal is to help the user decide what to apply to or research next.
+More sources can create more noise. Deduplication mattered more than adding additional feeds because repeated roles make daily triage slower and less trustworthy.
 
-### 5. Data fidelity over polished guesses
+### 5. Lightweight dashboard before complex product
 
-The tool avoids inventing missing fields. If the source does not state a location, salary, URL, or experience requirement, the dashboard should not infer one. This preserves trust.
+The dashboard stays intentionally lightweight. The goal is not to become a full CRM or job platform. The goal is to help the user decide what to apply to, research, or pursue next.
 
 ## Trade-offs
 
@@ -74,8 +79,9 @@ The tool avoids inventing missing fields. If the source does not state a locatio
 | Completeness vs. freshness | Freshness | Recent roles drive action. |
 | Rich UI vs. fast shipping | Static dashboard | Lower maintenance and faster deployment. |
 | Inferred metadata vs. source truth | Source truth | Trust beats cosmetic completeness. |
+| More sources vs. less noise | Less noise | Deduplication improved triage more than adding feeds. |
 | Broad roles vs. PM focus | PM focus | Narrower scope improves signal. |
-| Competing with mature tools vs. focused workflow | Focused workflow | The goal is not to beat Hiring Cafe. The goal is to demonstrate product judgment and solve a narrow daily need. |
+| Full job platform vs. focused workflow | Focused workflow | Stopping at a useful workflow mattered more than building a complex product. |
 
 ## What shipped
 
@@ -91,9 +97,11 @@ Live dashboard: https://sperowli.github.io/pm-farm/pm_roles.html
 
 ## What I learned
 
-The biggest product lesson was that building from a technical idea is not enough. The project became stronger when I admitted the first version was solution-led, then reframed around a specific user workflow and constrained the scope.
+The biggest product lesson was that building from a technical idea is not enough. The first version was solution-led because I started with the solution before defining requirements. That created unnecessary complexity and inefficient planning.
 
-That is the part I would carry into a PM role: do not defend the original solution. Find the sharper problem, define the decision the user needs to make, and reshape the product around that.
+The project became stronger when I stopped defending the original solution and asked what decision the user actually needed to make. The decision was not “show every possible PM job.” It was “help me quickly decide which fresh roles deserve action today.”
+
+That is the part I would carry into a PM role: define the workflow, clarify the requirements, choose the quality rules that matter, constrain scope, and stop once the product is useful.
 
 ## What I would improve next
 
@@ -125,4 +133,10 @@ The next iteration should stay small and decision-oriented:
 
 ## Interview story
 
-PM Farm started as a technical learning project. I wanted to learn APIs, scraping, automation, and AI-assisted coding by building something useful. The first version was solution-led. As I used it, I realized the actual product problem was narrower: I needed a faster way to triage fresh PM roles each morning so I could spend more time applying, networking, and preparing. I reframed the tool around that workflow, prioritized freshness and source fidelity over completeness, and shipped a lightweight dashboard that refreshes automatically. I do not position it as better than mature tools like Hiring Cafe. The product win was recognizing the sharper problem, constraining the scope, and turning a technical exploration into a usable decision-support tool.
+PM Farm started as a technical learning project. I wanted to learn APIs, scraping, automation, GitHub Actions, and AI-assisted coding by building something useful.
+
+The first version was solution-led. I had not clearly defined the requirements or the user workflow before building, which led to some inefficient planning and overbuilding.
+
+As I used the tool, I realized the real problem was narrower than “build a job search platform.” Tools like Hiring Cafe already do broad search better. The actual workflow I needed was daily triage: which fresh PM roles are relevant enough to apply to, research, or pursue through warm outreach today?
+
+I reframed the project around that workflow. I prioritized freshness, deduplication, source fidelity, and a lightweight dashboard over completeness or feature depth. The product win was not beating mature tools. It was recognizing that the original solution was too broad, narrowing the scope, and turning a technical exploration into a usable decision-support tool.

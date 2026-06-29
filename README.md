@@ -1,19 +1,23 @@
 # PM Farm
 
-**PM Farm is a live job-search intelligence tool for Product Manager candidates.** It pulls fresh Product Manager-track roles from company hiring systems, filters them to a focused target profile, and publishes a triage-ready dashboard that refreshes automatically.
+**PM Farm is a live PM job-search triage tool.** It pulls fresh Product Manager-track roles from hiring sources, filters them to a focused target profile, and publishes a lightweight dashboard for daily review.
 
 **Live dashboard:** https://sperowli.github.io/pm-farm/pm_roles.html  
 **Case study:** [CASE_STUDY.md](CASE_STUDY.md)
 
 ## Project framing
 
-This project started honestly as a technical learning project. I wanted to learn how to work with job-board APIs, scraping, automation, GitHub Actions, and AI-assisted coding. As I built it, I realized the more interesting product problem was not "can I scrape jobs?" It was:
+PM Farm started as a technical learning project. I wanted to learn how to work with APIs, scraping, automation, GitHub Actions, and AI-assisted coding by building something useful.
 
-> How can a PM candidate reduce daily job-search triage time and focus on roles worth acting on today?
+The first version was solution-led. I was asking, “Can I build this?” before I had clearly defined the user workflow.
 
-PM Farm does not try to beat mature search tools like Hiring Cafe. Those tools are broader, faster, and more polished. The product value here is narrower: a deliberately scoped workflow for one user profile, with strict freshness and data-quality rules, shipped as a working tool.
+As I used the tool, the sharper product problem became clear:
 
-The win is the product evolution: starting from a technical exploration, recognizing the actual user pain, narrowing the scope, defining the rules, and shipping a usable daily workflow.
+> How can a PM candidate reduce daily job-search triage time and focus on fresh roles worth acting on today?
+
+PM Farm does not try to beat mature search tools like Hiring Cafe. Those tools are broader, faster, and more polished. The value here is narrower: a scoped workflow for one user profile, with explicit freshness, deduplication, and data-quality rules.
+
+The product lesson was learning to move from technical exploration to a defined workflow: identify the decision the user needs to make, constrain the scope, and ship something usable.
 
 ## What it does
 
@@ -21,6 +25,7 @@ The win is the product evolution: starting from a technical exploration, recogni
 - **Filters to a target profile** focused on Product Manager and Associate Product Manager roles across NYC, San Francisco, and remote-friendly searches.
 - **Prioritizes freshness** so recent postings are easier to act on before they become stale.
 - **Deduplicates noisy listings** across URL, company, title, and source variants.
+- **Preserves source fidelity** by avoiding invented job details or polished guesses.
 - **Publishes a static dashboard** that can be opened quickly each morning.
 - **Runs automatically** through GitHub Actions so the tool stays current without manual scraping.
 
@@ -30,6 +35,7 @@ The win is the product evolution: starting from a technical exploration, recogni
 |---|---|
 | Technical exploration became a product workflow | The project moved from "learn APIs" to "reduce daily triage friction." |
 | Freshness over completeness | Recent roles are more actionable than large stale lists. |
+| Deduplication before more sources | Reducing repeated roles made the dashboard more useful than adding more noisy inputs. |
 | Direct hiring sources first | Company ATS feeds reduce dependency on recycled listings. |
 | Simple static dashboard | Fast to ship, easy to host, low maintenance. |
 | Strict data fidelity rules | Trust matters more than filling every field. |
@@ -86,7 +92,9 @@ The next highest-leverage improvements are intentionally small:
 
 ## Why this matters
 
-PM Farm demonstrates product judgment through the project arc: exploring a technical capability, discovering the sharper user problem, constraining scope, defining quality rules, shipping a working tool, and deciding where not to compete.
+PM Farm demonstrates the product arc I wanted to practice: start with technical curiosity, recognize when the first solution is too broad, define the sharper user workflow, constrain scope, and ship a working tool.
+
+The project is not meant to prove that I built a better job platform. It is meant to show that I can learn quickly, use AI-assisted development responsibly, define quality rules, make trade-offs, and turn a messy technical exploration into a usable decision-support workflow.
 
 ## License
 

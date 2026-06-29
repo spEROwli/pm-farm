@@ -5,13 +5,15 @@
 **Live dashboard:** https://sperowli.github.io/pm-farm/pm_roles.html  
 **Case study:** [CASE_STUDY.md](CASE_STUDY.md)
 
-## Product framing
+## Project framing
 
-Job seekers lose time checking fragmented career sites, stale aggregators, and noisy job boards. PM Farm was built to solve one specific user problem:
+This project started honestly as a technical learning project. I wanted to learn how to work with job-board APIs, scraping, automation, GitHub Actions, and AI-assisted coding. As I built it, I realized the more interesting product problem was not "can I scrape jobs?" It was:
 
-> Help a Product Manager candidate quickly find fresh, relevant roles and decide where to act today.
+> How can a PM candidate reduce daily job-search triage time and focus on roles worth acting on today?
 
-This project was built as a practical job-search operating tool, not as a coding novelty. I defined the user problem, source strategy, filtering rules, data-quality constraints, and prioritization logic, then used Claude Code as an implementation accelerator.
+PM Farm does not try to beat mature search tools like Hiring Cafe. Those tools are broader, faster, and more polished. The product value here is narrower: a deliberately scoped workflow for one user profile, with strict freshness and data-quality rules, shipped as a working tool.
+
+The win is the product evolution: starting from a technical exploration, recognizing the actual user pain, narrowing the scope, defining the rules, and shipping a usable daily workflow.
 
 ## What it does
 
@@ -26,6 +28,7 @@ This project was built as a practical job-search operating tool, not as a coding
 
 | Decision | Why it mattered |
 |---|---|
+| Technical exploration became a product workflow | The project moved from "learn APIs" to "reduce daily triage friction." |
 | Freshness over completeness | Recent roles are more actionable than large stale lists. |
 | Direct hiring sources first | Company ATS feeds reduce dependency on recycled listings. |
 | Simple static dashboard | Fast to ship, easy to host, low maintenance. |
@@ -83,7 +86,7 @@ The next highest-leverage improvements are intentionally small:
 
 ## Why this matters
 
-PM Farm demonstrates product judgment more than software complexity: identifying a painful workflow, narrowing scope, defining data-quality rules, shipping a working tool, and iterating toward faster decisions.
+PM Farm demonstrates product judgment through the project arc: exploring a technical capability, discovering the sharper user problem, constraining scope, defining quality rules, shipping a working tool, and deciding where not to compete.
 
 ## License
 

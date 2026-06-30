@@ -1,8 +1,9 @@
 # PM Farm
 
-PM Farm is a self-updating job-search triage tool I built during my Product Manager transition. It pulls PM and APM openings from company ATS APIs and targeted startup job sources, filters them to my target profile, and publishes a dashboard I use each morning.
+PM Farm is a self-updating PM job-search triage tool I built during my Product Manager transition. It pulls PM and APM openings from company ATS APIs and targeted startup job sources, filters them to my target profile, and publishes a dashboard I use each morning.
 
-**[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)**
+**[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)**  
+**[Product case study](CASE_STUDY.md)**
 
 > Built with Claude Code as an execution layer. I owned the problem definition, requirements, filtering rules, acceptance criteria, iteration loop, and daily usage. The repo is meant to show product judgment, product execution, and AI-assisted development discipline.
 
@@ -137,9 +138,10 @@ Python 3.11+ · standard library · GitHub Actions · SQLite · static HTML
 
 ### Next steps
 
-- Expand to Workday and SmartRecruiters, which require a different approach because their access patterns are less open.
-- Add company-stage filters for Seed, Series A, and Series B roles.
-- Improve location parsing for hybrid roles with ambiguous city language.
+- Add visible freshness filters for 1, 3, 7, and 14 day windows.
+- Add lightweight company-fit tags such as Healthtech, AI, Hardware, Developer Tools, and Enterprise SaaS.
+- Add shareable search URLs using query parameters.
+- Add a short daily digest for newly added roles.
 
 </details>
 

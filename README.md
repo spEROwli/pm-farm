@@ -10,13 +10,13 @@ PM Farm is a self-updating job-search triage tool I built during my Product Mana
 
 ## Problem and product arc
 
-Most job-search tools optimize for volume. I needed signal: fresh Product Manager roles in NYC, San Francisco, or U.S. remote that were worth acting on today.
+PM Farm started from a practical constraint in my own search: I did not need more job listings. I needed a reliable morning shortlist of roles worth acting on before the funnel was already crowded.
 
-The useful product was not another job database. It was a daily triage surface. That reframe changed the design priorities: freshness over breadth, filtering before display, source fidelity over inferred data, and zero recurring maintenance.
+Most job-search surfaces are optimized for discovery, not timing or fit. By the time a PM role appears across aggregators, it may already be stale, duplicated, or buried under irrelevant seniority levels. For this use case, breadth was not the product. Speed, freshness, and strict filtering were.
 
-The core insight was practical. Greenhouse, Ashby, Lever, and Workable expose live job data through public endpoints for many companies. That made a focused point solution possible: fetch directly where possible, supplement with targeted startup sources, apply tight rules, and publish automatically.
+That led to the core product decision: treat the system as a daily triage layer, not a scraper. The scraper is the mechanism. The product is the decision surface: fresh PM and APM roles in NYC, San Francisco, or U.S. remote, filtered before display, with source data preserved exactly as returned.
 
-What shipped: a static dashboard refreshed by GitHub Actions every morning at 7:30 AM ET. It surfaces PM and APM roles posted within the last 72 hours and requires no manual maintenance after deployment.
+What shipped is a self-updating dashboard that runs every morning at 7:30 AM ET through GitHub Actions, publishes only roles posted within the last 72 hours, and requires no recurring maintenance. I use it as part of my actual job-search workflow.
 
 ---
 

@@ -1,97 +1,57 @@
 # PM Farm
 
-PM Farm is a self-updating PM job-search triage tool I built during my Product Manager transition. It pulls PM and APM openings from company ATS APIs and targeted startup job sources, filters them to my target profile, and publishes a dashboard I use each morning.
+PM Farm is a small job-search utility that pulls Product Manager and Associate Product Manager roles from live hiring sources, filters them to a focused target profile, and publishes a simple dashboard for daily review.
 
 **[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)**  
-**[Product case study](CASE_STUDY.md)**
+**[Case study](CASE_STUDY.md)**
 
-> Built with Claude Code as an execution layer. I owned the problem definition, requirements, filtering rules, acceptance criteria, iteration loop, and daily usage. The repo is meant to show product judgment, product execution, and AI-assisted development discipline.
-
----
-
-## Problem and product arc
-
-PM Farm started from a practical constraint in my own search: I did not need more job listings. I needed a reliable morning shortlist of roles worth acting on before the funnel was already crowded.
-
-Most job-search surfaces are optimized for discovery, not timing or fit. By the time a PM role appears across aggregators, it may already be stale, duplicated, or buried under irrelevant seniority levels. For this use case, breadth was not the product. Speed, freshness, and strict filtering were.
-
-That led to the core product decision: treat the system as a daily triage layer, not a scraper. The scraper is the mechanism. The product is the decision surface: fresh PM and APM roles in NYC, San Francisco, or U.S. remote, filtered before display, with source data preserved exactly as returned.
-
-What shipped is a self-updating dashboard that runs every morning at 7:30 AM ET through GitHub Actions, publishes only roles posted within the last 72 hours, and requires no recurring maintenance. I use it as part of my actual job-search workflow.
+> Built with Claude Code as an execution layer. I defined the workflow, requirements, filtering rules, validation criteria, and iteration loop.
 
 ---
 
 ## What it does
 
-- Pulls live openings from company ATS APIs: Greenhouse, Ashby, Lever, and Workable.
-- Supplements direct ATS coverage with targeted startup job sources: YC Jobs, Wellfound, hiring.cafe, and The Muse.
-- Filters to PM and APM titles in NYC, San Francisco, and U.S. remote, posted within the last 72 hours.
-- Drops executive-layer titles at scrape time, including Director, VP, Head, Lead, and Principal.
-- Deduplicates across source URL, company and title, and known company-name variants.
-- Runs through GitHub Actions and commits the refreshed dashboard automatically.
+- Pulls roles from Greenhouse, Ashby, Lever, Workable, The Muse, YC Jobs, Wellfound, and hiring.cafe.
+- Filters to PM and APM roles in New York City, San Francisco, and U.S. remote.
+- Prioritizes recent postings.
+- Removes obvious seniority mismatches.
+- Deduplicates repeated listings.
+- Publishes a static dashboard through GitHub Pages.
+- Runs automatically through GitHub Actions.
 
 ---
 
-## Product decisions
+## Design choices
 
-| Decision | Alternatives considered | Rationale |
-|---|---|---|
-| Design for daily triage | Build a broad job database | The user need was not more listings. It was a short list of roles worth acting on today. |
-| Use direct ATS APIs as the backbone | Rely on LinkedIn, Indeed, or scraped search results | Direct ATS APIs are closer to the source of truth and reduce stale, duplicated, or resold listings. |
-| Add targeted startup sources | Only query known company slugs | Early-stage companies often recruit through YC Jobs, Wellfound, and startup job boards rather than a traditional public ATS slug. |
-| Enforce a 72-hour freshness cutoff | No cutoff; 7-day window | PM hiring moves fast. Older roles are less likely to produce immediate traction. |
-| Filter seniority before display | Let the dashboard user sort through everything | Noise should not reach the dashboard. Obvious mismatches are removed before they enter the output. |
-| Keep "Senior PM" titles | Drop Senior along with executive titles | Companies often use Senior as a default prefix. Dropping it would remove roles that may still fit. |
-| Preserve source data exactly | Infer missing experience, salary, or location fields | Blank fields stay blank. The tool should not invent data to make the dashboard look more complete. |
-| Ship as static HTML | Build a full web app | A static page solved the actual problem with lower maintenance, faster loading, and no hosted backend. |
-
----
-
-## PM skills demonstrated
-
-- **Problem framing:** Converted a messy job-search workflow into a specific daily decision problem.
-- **Product judgment:** Chose a narrow tool that solved one real workflow instead of building a generic job-search platform.
-- **Requirements authorship:** Wrote filtering and data-quality rules in [SCRAPER_RULES.md](SCRAPER_RULES.md) with enough precision to drive implementation.
-- **Scope discipline:** Explicitly avoided employer profiles, application tracking, salary inference, and other features that would add maintenance without improving daily triage.
-- **AI-assisted execution:** Used Claude Code to move faster while retaining ownership of the requirements, constraints, product logic, and acceptance criteria.
-- **Production learning:** Early runs exposed failure modes around inferred data and noisy matches. Those failures became stricter source-fidelity and filtering rules.
-- **Shipped behavior:** The product runs automatically and is part of my actual job-search workflow, not just a portfolio artifact.
+| Choice | Reason |
+|---|---|
+| Narrow role scope | Keeps the dashboard focused. |
+| Freshness filter | Recent postings are more useful for daily review. |
+| Source fidelity | The tool does not invent missing job details. |
+| Static dashboard | Simple to host and maintain. |
+| Documented rules | Filtering behavior is explicit in [SCRAPER_RULES.md](SCRAPER_RULES.md). |
 
 ---
 
 ## For developers
 
 <details>
-<summary>Architecture, setup, and tests</summary>
+<summary>Architecture, setup, configuration, sources, and tests</summary>
 
 ### Architecture
 
 ```
-verified_companies.json     company ATS slugs
+verified_companies.json
          |
          v
-pmfarm.py -- parallel ThreadPoolExecutor
-    |-- Greenhouse  boards-api.greenhouse.io/v1/boards/{slug}/jobs
-    |-- Ashby       api.ashbyhq.com/posting-api/job-board/{slug}
-    |-- Lever       api.lever.co/v0/postings/{slug}?mode=json
-    |-- Workable    apply.workable.com/api/v3/accounts/{slug}/jobs
-    |-- The Muse    themuse.com/api/public/jobs
-    |-- hiring.cafe via Bright Data Web Unlocker
-    |-- YC Jobs     ycombinator.com/jobs/role/product-manager via Web Unlocker
-    |-- Wellfound   wellfound.com/role/l/product-manager/{geo} via Web Unlocker
+pmfarm.py -- source fetchers, filters, dedupe
          |
-         v
-filter: title, seniority, freshness, location, experience bar
-         |
-         v
-dedupe: normalized URL + company/title + name variants + applied log
-         |
-         |-- pm_roles.csv  ->  build_page.py  ->  pm_roles.html
+         |-- pm_roles.csv -> build_page.py -> pm_roles.html
          |
          |-- companies.db
 ```
 
-GitHub Actions (`.github/workflows/daily-scrape.yml`) runs the full chain and commits the refreshed output back to `main` each morning.
+GitHub Actions (`.github/workflows/daily-scrape.yml`) runs the pipeline and commits the refreshed output back to `main`.
 
 ### Running locally
 
@@ -117,7 +77,7 @@ python3 add_company.py "Acme Corp"   # probe a company and add to verified_compa
 python3 -m pytest test_pmfarm.py -v
 ```
 
-13 test groups covering title and seniority filtering, deduplication, location classification, experience parsing, Bright Data HTML parsing, and output rendering.
+13 test groups cover title and seniority filtering, deduplication, location classification, experience parsing, Bright Data HTML parsing, and output rendering.
 
 ### Data sources
 
@@ -134,14 +94,14 @@ python3 -m pytest test_pmfarm.py -v
 
 ### Stack
 
-Python 3.11+ · standard library · GitHub Actions · SQLite · static HTML
+Python 3.11+ · standard library · GitHub Actions · SQLite · GitHub Pages · static HTML
 
-### Next steps
+### Possible next steps
 
-- Add visible freshness filters for 1, 3, 7, and 14 day windows.
-- Add lightweight company-fit tags such as Healthtech, AI, Hardware, Developer Tools, and Enterprise SaaS.
-- Add shareable search URLs using query parameters.
-- Add a short daily digest for newly added roles.
+- Add freshness filters for 1, 3, 7, and 14 day windows.
+- Add lightweight company tags.
+- Add shareable search URLs.
+- Add a short daily digest.
 
 </details>
 

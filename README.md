@@ -4,7 +4,7 @@ PM Farm is a self-updating job-search triage tool I built during my Product Mana
 
 **[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)**
 
-> Built with Claude Code as an execution layer. I owned the problem definition, requirements, filtering rules, acceptance criteria, iteration loop, and daily usage. The repo is meant to show product judgment, not software-engineering theater.
+> Built with Claude Code as an execution layer. I owned the problem definition, requirements, filtering rules, acceptance criteria, iteration loop, and daily usage. The repo is meant to show product judgment, product execution, and AI-assisted development discipline.
 
 ---
 

@@ -1,143 +1,125 @@
 # PM Farm
 
-A personal automation I built during my job search: a daily scraper that pulls
-Product-Manager-track openings directly from companies' hiring APIs, filters them
-to my target profile, and publishes a triage-ready dashboard — refreshed every morning
-without me touching it.
+PM Farm is a self-updating PM job-search triage tool I built during my Product Manager transition. It pulls PM and APM openings from company ATS APIs and targeted startup job sources, filters them to my target profile, and publishes a dashboard I use each morning.
 
-**[Live dashboard →](https://sperowli.github.io/pm-farm/pm_roles.html)**
+**[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)**  
+**[Product case study](CASE_STUDY.md)**
 
-> Built entirely with Claude Code — used as a daily force multiplier, not a novelty. I'm a PM
-> candidate, not a software engineer. I defined the problem, wrote the requirements and filtering
-> rules (see [`SCRAPER_RULES.md`](SCRAPER_RULES.md)), iterated on the logic based on what the
-> data showed, and have opened this dashboard every morning since it shipped.
+> Built with Claude Code as an execution layer. I owned the problem definition, requirements, filtering rules, acceptance criteria, iteration loop, and daily usage. The repo is meant to show product judgment, product execution, and AI-assisted development discipline.
 
 ---
 
-## Why I built this
+## Problem and product arc
 
-Most job-search tools re-sell listings that are 2–3 days stale, charge for API
-access, or require scraping fragile HTML. The three dominant ATS platforms —
-Greenhouse, Ashby, and Lever — all expose live JSON APIs with no auth required.
-So I cut the middleman: fetch directly, filter precisely, publish automatically.
+PM Farm started from a practical constraint in my own search: I did not need more job listings. I needed a reliable morning shortlist of roles worth acting on before the funnel was already crowded.
 
-The result is a single self-updating page I open each morning instead of cycling
-through a dozen career sites.
+Most job-search surfaces are optimized for discovery, not timing or fit. By the time a PM role appears across aggregators, it may already be stale, duplicated, or buried under irrelevant seniority levels. For this use case, breadth was not the product. Speed, freshness, and strict filtering were.
+
+That led to the core product decision: treat the system as a daily triage layer, not a scraper. The scraper is the mechanism. The product is the decision surface: fresh PM and APM roles in NYC, San Francisco, or U.S. remote, filtered before display, with source data preserved exactly as returned.
+
+What shipped is a self-updating dashboard that runs every morning at 7:30 AM ET through GitHub Actions, publishes only roles posted within the last 72 hours, and requires no recurring maintenance. I use it as part of my actual job-search workflow.
+
+---
 
 ## What it does
 
-- **Pulls from live sources** — company ATS APIs (Greenhouse, Ashby, Lever, Workable)
-  with no auth required, plus hiring.cafe, YC Jobs, and Wellfound via Bright Data
-  Web Unlocker for the startup roles that never touch those ATS platforms. Every role
-  on the live dashboard was returned by a real API or live scrape call that morning —
-  no stale caches, no re-sold listings.
-- **Filters to a tight target profile:** Product Manager and Associate Product
-  Manager only, NYC + SF + US-remote. Executive-layer titles (Director, VP, Head,
-  Lead, Principal) are dropped at scrape time; "Senior" is kept since companies
-  often use it as a default prefix with no actual seniority bar.
-- **Enforces freshness:** anything posted more than 72 hours ago is removed —
-  PM hiring moves fast, and a stale listing is a dead one.
-- **De-duplicates** by normalized URL, by company+title, and across aggregator
-  name variants (e.g. "JPMorganChase" vs "JPMorgan Chase Bank, N.A.").
-- **Runs itself** via GitHub Actions at 7:30am ET daily and commits the updated
-  dashboard — zero maintenance once deployed.
+- Pulls live openings from company ATS APIs: Greenhouse, Ashby, Lever, and Workable.
+- Supplements direct ATS coverage with targeted startup job sources: YC Jobs, Wellfound, hiring.cafe, and The Muse.
+- Filters to PM and APM titles in NYC, San Francisco, and U.S. remote, posted within the last 72 hours.
+- Drops executive-layer titles at scrape time, including Director, VP, Head, Lead, and Principal.
+- Deduplicates across source URL, company and title, and known company-name variants.
+- Runs through GitHub Actions and commits the refreshed dashboard automatically.
 
-## Architecture
+---
+
+## Product decisions
+
+| Decision | Alternatives considered | Rationale |
+|---|---|---|
+| Design for daily triage | Build a broad job database | The user need was not more listings. It was a short list of roles worth acting on today. |
+| Use direct ATS APIs as the backbone | Rely on LinkedIn, Indeed, or scraped search results | Direct ATS APIs are closer to the source of truth and reduce stale, duplicated, or resold listings. |
+| Add targeted startup sources | Only query known company slugs | Early-stage companies often recruit through YC Jobs, Wellfound, and startup job boards rather than a traditional public ATS slug. |
+| Enforce a 72-hour freshness cutoff | No cutoff; 7-day window | PM hiring moves fast. Older roles are less likely to produce immediate traction. |
+| Filter seniority before display | Let the dashboard user sort through everything | Noise should not reach the dashboard. Obvious mismatches are removed before they enter the output. |
+| Keep "Senior PM" titles | Drop Senior along with executive titles | Companies often use Senior as a default prefix. Dropping it would remove roles that may still fit. |
+| Preserve source data exactly | Infer missing experience, salary, or location fields | Blank fields stay blank. The tool should not invent data to make the dashboard look more complete. |
+| Ship as static HTML | Build a full web app | A static page solved the actual problem with lower maintenance, faster loading, and no hosted backend. |
+
+---
+
+## PM skills demonstrated
+
+- **Problem framing:** Converted a messy job-search workflow into a specific daily decision problem.
+- **Product judgment:** Chose a narrow tool that solved one real workflow instead of building a generic job-search platform.
+- **Requirements authorship:** Wrote filtering and data-quality rules in [SCRAPER_RULES.md](SCRAPER_RULES.md) with enough precision to drive implementation.
+- **Scope discipline:** Explicitly avoided employer profiles, application tracking, salary inference, and other features that would add maintenance without improving daily triage.
+- **AI-assisted execution:** Used Claude Code to move faster while retaining ownership of the requirements, constraints, product logic, and acceptance criteria.
+- **Production learning:** Early runs exposed failure modes around inferred data and noisy matches. Those failures became stricter source-fidelity and filtering rules.
+- **Shipped behavior:** The product runs automatically and is part of my actual job-search workflow, not just a portfolio artifact.
+
+---
+
+## For developers
+
+<details>
+<summary>Architecture, setup, and tests</summary>
+
+### Architecture
 
 ```
-verified_companies.json     ~95 company ATS slugs
-         │
-         ▼
-pmfarm.py ── parallel ThreadPoolExecutor
-    ├── Greenhouse  boards-api.greenhouse.io/v1/boards/{slug}/jobs
-    ├── Ashby       api.ashbyhq.com/posting-api/job-board/{slug}
-    ├── Lever       api.lever.co/v0/postings/{slug}?mode=json
-    ├── Workable    apply.workable.com/api/v3/accounts/{slug}/jobs
-    ├── The Muse    themuse.com/api/public/jobs
-    ├── hiring.cafe via Bright Data Web Unlocker  (role-slug pages, NYC + SF)
-    ├── YC Jobs     ycombinator.com/jobs/role/product-manager  (Web Unlocker)
-    └── Wellfound   wellfound.com/role/l/product-manager/{geo}  (Web Unlocker)
-         │
-         ▼
-filter: title (PM/APM only) · experience bar (regex from JD) · 72h freshness · location
-         │
-         ▼
-dedupe: normalized URL + company|title + aggregator name-variants + applied log
-         │
-         ├── pm_roles.csv  →  build_page.py  →  pm_roles.html   (the dashboard)
-         │
-         └── companies.db  (self-cleaning: slugs that return nothing are pruned)
+verified_companies.json     company ATS slugs
+         |
+         v
+pmfarm.py -- parallel ThreadPoolExecutor
+    |-- Greenhouse  boards-api.greenhouse.io/v1/boards/{slug}/jobs
+    |-- Ashby       api.ashbyhq.com/posting-api/job-board/{slug}
+    |-- Lever       api.lever.co/v0/postings/{slug}?mode=json
+    |-- Workable    apply.workable.com/api/v3/accounts/{slug}/jobs
+    |-- The Muse    themuse.com/api/public/jobs
+    |-- hiring.cafe via Bright Data Web Unlocker
+    |-- YC Jobs     ycombinator.com/jobs/role/product-manager via Web Unlocker
+    |-- Wellfound   wellfound.com/role/l/product-manager/{geo} via Web Unlocker
+         |
+         v
+filter: title, seniority, freshness, location, experience bar
+         |
+         v
+dedupe: normalized URL + company/title + name variants + applied log
+         |
+         |-- pm_roles.csv  ->  build_page.py  ->  pm_roles.html
+         |
+         |-- companies.db
 ```
 
-GitHub Actions workflow (`.github/workflows/daily-scrape.yml`) runs the full
-chain and commits the outputs back to `main` each morning.
+GitHub Actions (`.github/workflows/daily-scrape.yml`) runs the full chain and commits the refreshed output back to `main` each morning.
 
-## Key engineering decisions
-
-**Direct ATS access as the backbone, search APIs for breadth.** The curated
-~95 companies are hit directly through their public Greenhouse/Ashby/Lever/Workable
-JSON (no auth, typically <100ms/request) — those are the companies I most want to
-work at. The Muse, hiring.cafe, YC Jobs, and Wellfound then widen coverage to any
-company posting a matching role — including early-stage startups that recruit only
-through YC/Wellfound and never appear in a traditional ATS. Everything flows through
-the same title/experience/freshness gate, so a role from a scrape is held to the
-exact same bar as a direct ATS hit.
-
-**Pure standard library.** `urllib`, `csv`, `sqlite3`, `re`, `ThreadPoolExecutor`
-— no requests, no BeautifulSoup, no pandas. Zero third-party dependencies.
-Fast to install, zero dependency drift.
-
-**Data fidelity over convenience.** Every field on the dashboard reflects exactly
-what the ATS returned. Blank experience field = the JD didn't state one. The
-scraper never guesses or fills in. See [`SCRAPER_RULES.md`](SCRAPER_RULES.md).
-
-**Self-healing company list.** `discover.py` seeds new ATS slugs from three sources:
-YC's public company directory (default), Forbes Cloud 100 (`--from-forbes`, parses
-`__NEXT_DATA__` JSON from the Next.js list page), and the a16z portfolio
-(`--from-a16z`, static fetch with Bright Data JS-render fallback). Each discovered
-company is probed against Greenhouse/Ashby/Lever and promoted to
-`verified_companies.json` with a `source` tag — no API key needed for direct ATS
-hits on future runs. `companies.db` tracks hit rates per slug; ones that return
-nothing across several runs are pruned automatically.
-
-## Running it
+### Running locally
 
 ```bash
-python3 pmfarm.py         # scrape → pm_roles.csv
-python3 build_page.py     # render → pm_roles.html
-python3 add_company.py "Acme Corp"   # probe a single company and add it to verified_companies.json
+python3 pmfarm.py                    # scrape -> pm_roles.csv
+python3 build_page.py                # render -> pm_roles.html
+python3 add_company.py "Acme Corp"   # probe a company and add to verified_companies.json
 ```
 
-Automated runs are handled by GitHub Actions
-([`.github/workflows/daily-scrape.yml`](.github/workflows/daily-scrape.yml)) —
-it runs the full pipeline at 7:30am ET daily and commits the refreshed dashboard,
-so the live page stays current with no machine of mine needing to be on.
-
-## Configuration
-
-Tune at the top of `pmfarm.py`:
+### Configuration
 
 | Variable | Default | Effect |
 |---|---|---|
-| `MAX_AGE_DAYS` | `3` | Drop postings older than this (72h freshness rule) |
+| `MAX_AGE_DAYS` | `3` | Drop postings older than this |
 | `EXPERIENCE_CAP` | `3` | Max years required experience to keep |
 | `TITLE_MUST_INCLUDE` | PM / APM | Which role titles qualify |
 | `NYC_LOCS / SF_LOCS` | see file | Target geographies |
 | `SOURCES` | all on | Toggle each source |
 
-The company list lives in `verified_companies.json` (committed) and `companies.db`
-(local, self-cleaning). Run `python3 discover.py` to seed new companies.
-
-## Tests
+### Tests
 
 ```bash
 python3 -m pytest test_pmfarm.py -v
 ```
 
-13 test groups covering title/seniority filtering, deduplication, location
-classification, experience parsing, Bright Data HTML parsing, and output rendering.
+13 test groups covering title and seniority filtering, deduplication, location classification, experience parsing, Bright Data HTML parsing, and output rendering.
 
-## Data sources
+### Data sources
 
 | Source | Endpoint | Auth |
 |---|---|---|
@@ -146,14 +128,23 @@ classification, experience parsing, Bright Data HTML parsing, and output renderi
 | Lever | `api.lever.co` | none |
 | Workable | `apply.workable.com` | none |
 | The Muse | `themuse.com/api` | none |
-| hiring.cafe | via Bright Data Web Unlocker | API key (GitHub secret) |
-| YC Jobs | `ycombinator.com/jobs` via Bright Data Web Unlocker | API key (GitHub secret) |
-| Wellfound | `wellfound.com/role/l` via Bright Data Web Unlocker | API key (GitHub secret) |
+| hiring.cafe | via Bright Data Web Unlocker | API key, GitHub secret |
+| YC Jobs | `ycombinator.com/jobs` via Bright Data Web Unlocker | API key, GitHub secret |
+| Wellfound | `wellfound.com/role/l` via Bright Data Web Unlocker | API key, GitHub secret |
 
-## Stack
+### Stack
 
 Python 3.11+ · standard library · GitHub Actions · SQLite · static HTML
 
-## License
+### Next steps
+
+- Add visible freshness filters for 1, 3, 7, and 14 day windows.
+- Add lightweight company-fit tags such as Healthtech, AI, Hardware, Developer Tools, and Enterprise SaaS.
+- Add shareable search URLs using query parameters.
+- Add a short daily digest for newly added roles.
+
+</details>
+
+---
 
 [MIT](LICENSE)

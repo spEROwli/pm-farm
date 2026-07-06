@@ -5,7 +5,7 @@ PM Farm is a small job-search utility that pulls Product Manager and Associate P
 **[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)**  
 **[Case study](CASE_STUDY.md)**
 
-> Built with Claude Code as an execution layer. I defined the workflow, requirements, filtering rules, validation criteria, and iteration loop.
+> I defined the workflow, requirements, filtering rules, validation criteria, and iteration loop. AI tooling was used as an execution aid.
 
 ---
 
@@ -59,13 +59,18 @@ python3 build_page.py                # render -> pm_roles.html
 python3 add_company.py "Acme Corp"   # probe a company and add to verified_companies.json
 ```
 
+The title filter is externally configurable. `TITLE_MUST_INCLUDE` defaults to PM
+and APM. Adding an optional `titles_local.txt` (one title fragment per line)
+replaces that list for a local run and writes to `pm_roles_wide.csv` so the
+default output stays untouched.
+
 ### Configuration
 
 | Variable | Default | Effect |
 |---|---|---|
 | `MAX_AGE_DAYS` | `3` | Drop postings older than this |
 | `EXPERIENCE_CAP` | `3` | Max years required experience to keep |
-| `TITLE_MUST_INCLUDE` | PM / APM | Which role titles qualify |
+| `TITLE_MUST_INCLUDE` | PM / APM | Which role titles qualify (override with `titles_local.txt`) |
 | `NYC_LOCS / SF_LOCS` | see file | Target geographies |
 | `SOURCES` | all on | Toggle each source |
 

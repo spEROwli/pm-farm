@@ -1,6 +1,6 @@
 # PM Farm
 
-PM Farm is a small job-search utility that pulls Product Manager and Associate Product Manager roles from live hiring sources, filters them to a focused target profile, and publishes a simple dashboard for daily review.
+PM Farm is a job-search intelligence pipeline that pulls Product Manager and Associate Product Manager roles from eight live hiring sources, filters them to a focused target profile, and publishes a triage-ready dashboard for daily review.
 
 **[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)** · **[Case study](CASE_STUDY.md)**
 

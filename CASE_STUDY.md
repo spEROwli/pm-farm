@@ -2,7 +2,7 @@
 
 ## Summary
 
-PM Farm is a small daily triage tool for Product Manager and Associate Product Manager job searches. It narrows a noisy search process into a simple list of recent roles to review each morning.
+PM Farm is a daily triage tool for Product Manager and Associate Product Manager job searches. It narrows a noisy search process into a focused list of recent roles to review each morning.
 
 ## Starting point
 

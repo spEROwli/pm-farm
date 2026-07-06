@@ -4,6 +4,12 @@ test_pmfarm.py — all 8 adversarial test cases.
 Run: python3 test_pmfarm.py
 """
 import csv, io, json, os, sys, tempfile, shutil
+
+# Windows consoles default to cp1252, which cannot encode the box-drawing
+# characters in test headers. Force UTF-8 so the suite runs everywhere.
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 import pmfarm
 import build_page
 
@@ -287,8 +293,14 @@ def test_7_idempotency():
     tmpdir = tempfile.mkdtemp()
     orig_gmail = pmfarm.GMAIL_FILE
     orig_applied = pmfarm.APPLIED_FILE
+    # Disable every network-backed source: idempotency can only be asserted
+    # over mocked data. Live sources vary between the two runs (and the
+    # Brightdata ones bill per request).
+    orig_sources = dict(pmfarm.SOURCES)
 
     try:
+        pmfarm.SOURCES.update({"brightdata": False, "yc": False,
+                               "wellfound": False, "muse": False})
         pmfarm.fetch_greenhouse = mock_gh
         pmfarm.fetch_ashby      = mock_ash
         pmfarm.fetch_lever      = mock_lev
@@ -308,6 +320,7 @@ def test_7_idempotency():
             rows1 = list(csv.DictReader(f1))
             rows2 = list(csv.DictReader(f2))
     finally:
+        pmfarm.SOURCES.clear(); pmfarm.SOURCES.update(orig_sources)
         pmfarm.fetch_greenhouse = orig_gh
         pmfarm.fetch_ashby      = orig_ash
         pmfarm.fetch_lever      = orig_lev

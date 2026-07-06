@@ -2,8 +2,7 @@
 
 PM Farm is a small job-search utility that pulls Product Manager and Associate Product Manager roles from live hiring sources, filters them to a focused target profile, and publishes a simple dashboard for daily review.
 
-**[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)**  
-**[Case study](CASE_STUDY.md)**
+**[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)** · **[Case study](CASE_STUDY.md)**
 
 > Built with Claude Code as an execution layer. I defined the workflow, requirements, filtering rules, validation criteria, and iteration loop.
 
@@ -65,7 +64,7 @@ python3 add_company.py "Acme Corp"   # probe a company and add to verified_compa
 |---|---|---|
 | `MAX_AGE_DAYS` | `3` | Drop postings older than this |
 | `EXPERIENCE_CAP` | `3` | Max years required experience to keep |
-| `TITLE_MUST_INCLUDE` | PM / APM | Which role titles qualify |
+| `TITLE_MUST_INCLUDE` | PM / APM | Which role titles qualify; an optional `titles_local.txt` can replace this list for flexibility to adapt to other role titles |
 | `NYC_LOCS / SF_LOCS` | see file | Target geographies |
 | `SOURCES` | all on | Toggle each source |
 

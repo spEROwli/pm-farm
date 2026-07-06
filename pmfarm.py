@@ -15,10 +15,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ── SOURCES (parametric toggles) ──────────────────────────────────────────────
 # Master switch per source. Adding or tuning a source is a config edit here, not
-# surgery in cmd_local. The ATS sources (greenhouse/ashby/lever) are live; the
-# disabled aggregators (themuse/remotive/adzuna) are not toggled here because they
-# are intentionally not called at all. "brightdata" (hiring.cafe) ships OFF and
-# stays inert — zero spend — until the API key exists. See BRIGHTDATA_SETUP.md.
+# surgery in cmd_local. "brightdata" (hiring.cafe), "yc", and "wellfound" go
+# through the Bright Data Web Unlocker and are inert — zero spend — unless an
+# API key exists (BRIGHTDATA_API_KEY env var or brightdata_key.txt).
 SOURCES = {
     "greenhouse": True,
     "ashby":      True,
@@ -303,21 +302,6 @@ _FALLBACK_LEV = [
 
 
 def _load_companies() -> tuple[list, list, list]:
-    # Preferred source: companies.db (self-cleaning, learns which slugs are live).
-    # Build it with `python3 build_companydb.py`. Falls back to the JSON cache and
-    # then the hardcoded lists if the DB is absent or empty.
-    try:
-        import companydb, os
-        if os.path.exists(companydb.DB_FILE):
-            gh  = companydb.load_active("greenhouse")
-            ash = companydb.load_active("ashby")
-            lev = companydb.load_active("lever")
-            if gh or ash or lev:
-                return (gh or _FALLBACK_GH, ash or _FALLBACK_ASH, lev or _FALLBACK_LEV)
-    except Exception as e:
-        print(f"  [warn] companies.db load failed ({e}); using JSON cache",
-              file=sys.stderr)
-
     gh = ash = lev = None
     try:
         import os
@@ -927,11 +911,16 @@ def _hiringcafe_job(h: dict) -> dict | None:
     location = v5.get("formatted_workplace_location") or ""
     date_str = datetime.datetime.now(datetime.timezone.utc).isoformat()  # hiring.cafe only surfaces active listings; treat fetch date as post date
     parts: list[str] = []
-    yoe = v5.get("min_industry_and_role_yoe")
-    if not v5.get("is_min_industry_and_role_yoe_not_mentioned") and yoe is not None:
-        parts.append(f"{yoe}+ years experience required")   # so _parse_years can read the bar
     if v5.get("requirements_summary"):
         parts.append(str(v5["requirements_summary"]))
+    # The structured yoe is a fallback bar only: when the requirements text
+    # already states a years figure, that text governs. Injecting yoe alongside
+    # it let a low role-specific value (yoe=2) out-vote an explicit "8+ years"
+    # requirement, because _parse_years gates on the minimum hard bar.
+    yoe = v5.get("min_industry_and_role_yoe")
+    if (not v5.get("is_min_industry_and_role_yoe_not_mentioned") and yoe is not None
+            and _parse_years(_strip_html(". ".join(parts)))[0] == "unknown"):
+        parts.insert(0, f"{yoe}+ years experience required")   # so _parse_years can read the bar
     content = _strip_html(". ".join(parts)) or title
     return _make_job("hiring.cafe", company, title, location,
                      url, content[:500], date_str, full_content=content)
@@ -1519,16 +1508,6 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
             failed = [k for k, v in sorted(_slug_resolution.items()) if v == "fail"]
             print("  Failed slugs: " + ", ".join(failed[:20])
                   + (f" … +{fail_n - 20} more" if fail_n > 20 else ""))
-
-        # Persist this run's outcomes so companies.db self-cleans: live slugs
-        # rise, repeatedly-failing ones get pruned from future runs.
-        try:
-            import companydb, os
-            if os.path.exists(companydb.DB_FILE):
-                companydb.record_results(_slug_resolution)
-                print(f"  (recorded results to {companydb.DB_FILE})")
-        except Exception as e:
-            print(f"  [warn] could not update companies.db: {e}", file=sys.stderr)
 
     _output(jobs, 0)
 

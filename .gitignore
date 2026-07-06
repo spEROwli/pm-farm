@@ -16,3 +16,6 @@ logs/
 .claude/
 ROLES_TODAY.md
 com.pmfarm.daily.plist
+pm_improvement_plan.txt
+.vscode/
+AUDIT_REPORT.md

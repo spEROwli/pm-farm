@@ -46,9 +46,7 @@ verified_companies.json
          v
 pmfarm.py -- source fetchers, filters, dedupe
          |
-         |-- pm_roles.csv -> build_page.py -> pm_roles.html
-         |
-         |-- companies.db
+         '-- pm_roles.csv -> build_page.py -> pm_roles.html
 ```
 
 GitHub Actions (`.github/workflows/daily-scrape.yml`) runs the pipeline and commits the refreshed output back to `main`.
@@ -74,7 +72,7 @@ python3 add_company.py "Acme Corp"   # probe a company and add to verified_compa
 ### Tests
 
 ```bash
-python3 -m pytest test_pmfarm.py -v
+python3 test_pmfarm.py
 ```
 
 13 test groups cover title and seniority filtering, deduplication, location classification, experience parsing, Bright Data HTML parsing, and output rendering.
@@ -94,7 +92,7 @@ python3 -m pytest test_pmfarm.py -v
 
 ### Stack
 
-Python 3.11+ · standard library · GitHub Actions · SQLite · GitHub Pages · static HTML
+Python 3.11+ · standard library · GitHub Actions · GitHub Pages · static HTML
 
 ### Possible next steps
 

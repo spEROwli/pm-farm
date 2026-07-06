@@ -13,6 +13,13 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
 import pmfarm
 import build_page
 
+# Tests assert the PM-only portfolio behavior. A developer's personal
+# titles_local.txt (gitignored) would otherwise load pmfarm in wide-net mode and
+# flip global title config, so pin it back to the defaults for a deterministic run.
+pmfarm._WIDE_TITLE_MODE = False
+pmfarm.TITLE_MUST_INCLUDE = ["product manager", "associate product manager"]
+pmfarm.TITLE_EXCLUDE = ["marketing", "product marketing", "product designer", "product analyst"]
+
 PASS, FAIL = "PASS", "FAIL"
 results: list[tuple] = []
 

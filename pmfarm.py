@@ -177,10 +177,37 @@ def _hiringcafe_urls() -> list[str]:
 
 
 # ── FILTERS ──────────────────────────────────────────────────────────────────
-TITLE_MUST_INCLUDE = [
-    "product manager", "associate product manager",
-]
-TITLE_EXCLUDE = ["marketing", "product marketing", "product designer", "product analyst"]
+# Title include-list. Default is PM-only — this is what the public daily
+# dashboard (GitHub Actions) runs on, so the portfolio stays focused and honest.
+# For a personal wider search, drop a gitignored titles_local.txt in the repo
+# root (one title fragment per line; blank lines and '#' comments ignored). When
+# present it REPLACES the default list AND relaxes the executive-title gate, so
+# families like Solutions Engineer / TPM / Forward Deployed / Chief of Staff
+# surface too. Absent → PM-only, unchanged behavior.
+_TITLES_LOCAL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "titles_local.txt")
+
+
+def _load_title_includes() -> tuple[list[str], bool]:
+    """Return (title_fragments, wide_mode). wide_mode disables the executive-title
+    gate so exec-adjacent titles (chief of staff, head of X) survive a personal
+    wide-net run. Falls back to PM-only when titles_local.txt is absent/empty."""
+    try:
+        with open(_TITLES_LOCAL_FILE, encoding="utf-8") as f:
+            titles = [ln.strip().lower() for ln in f
+                      if ln.strip() and not ln.lstrip().startswith("#")]
+        if titles:
+            print(f"  [titles] wide-net mode: {len(titles)} title fragments from "
+                  f"titles_local.txt (portfolio default is PM-only)", file=sys.stderr)
+            return titles, True
+    except FileNotFoundError:
+        pass
+    return ["product manager", "associate product manager"], False
+
+
+TITLE_MUST_INCLUDE, _WIDE_TITLE_MODE = _load_title_includes()
+# "product analyst" is only excluded in PM-only mode; the wide net wants it.
+TITLE_EXCLUDE = (["marketing", "product marketing", "product designer"]
+                 + ([] if _WIDE_TITLE_MODE else ["product analyst"]))
 
 # Executive/org-layer titles dropped on the title alone. "Senior" and "Sr" are
 # intentionally NOT in this list — many companies use them as default prefixes
@@ -390,7 +417,9 @@ GMAIL_FILE   = "gmail_applied.txt"  # synced by pmfarm_gmail_sync.py; one compan
 # role), so it hides every role at any company you've applied to — too aggressive.
 # OFF by default; role-level dedupe via applied.csv (URL match) is the tracking path.
 GMAIL_DEDUPE = False
-OUTPUT_FILE  = "pm_roles.csv"
+# Wide-net personal runs write to a separate, gitignored CSV so a local search
+# never overwrites the committed portfolio dashboard (pm_roles.csv/html).
+OUTPUT_FILE  = "pm_roles_wide.csv" if _WIDE_TITLE_MODE else "pm_roles.csv"
 
 # Populated by fetch_* functions; reset at the start of each cmd_local run.
 # key = "source:slug", value = "ok" | "empty" | "fail"
@@ -599,7 +628,9 @@ def _passes_title(title: str) -> bool:
     # Only unambiguous executive titles disqualify on the title alone. Seniority
     # otherwise is enforced by the stated-years gate (EXPERIENCE_CAP) downstream,
     # so a "Senior Associate" or a "Senior PM" with a <=3yr bar is NOT dropped here.
-    if _HARD_SENIOR_RE.search(t):
+    # Wide-net mode keeps exec-adjacent titles (Chief of Staff, Head of X) — the
+    # personal search decides its own ceiling.
+    if not _WIDE_TITLE_MODE and _HARD_SENIOR_RE.search(t):
         return False
     return True
 

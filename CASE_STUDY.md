@@ -38,7 +38,7 @@ The first useful version focused on a few constraints:
 |---|---|
 | Breadth vs. focus | Focused role scope |
 | Completeness vs. freshness | Freshness |
-| Rich UI vs. simple output | Static dashboard |
+| Rich UI vs. focused output | Static dashboard |
 | Filled-in fields vs. source truth | Source truth |
 | More sources vs. lower noise | Lower noise first |
 
@@ -58,7 +58,7 @@ Live dashboard: https://sperowli.github.io/pm-farm/pm_roles.html
 
 The main lesson was to separate the mechanism from the product. The scraper is the mechanism. The product is the daily decision surface.
 
-The project became better when I narrowed it around the workflow instead of adding more features. For this use case, a small reliable tool was more useful than a broader platform.
+The project became better when I narrowed it around the workflow instead of adding more features. For this use case, a focused reliable tool was more useful than a broader platform.
 
 ## Possible next steps
 

@@ -27,7 +27,7 @@ PM Farm is a job-search intelligence pipeline that pulls Product Manager and Ass
 | Narrow role scope | Keeps the dashboard focused. |
 | Freshness filter | Recent postings are more useful for daily review. |
 | Source fidelity | The tool does not invent missing job details. |
-| Static dashboard | Simple to host and maintain. |
+| Static dashboard | Fast to host and maintain. |
 | Documented rules | Filtering behavior is explicit in [SCRAPER_RULES.md](SCRAPER_RULES.md). |
 
 ---

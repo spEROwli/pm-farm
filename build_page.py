@@ -9,7 +9,7 @@ Layout:
   • Primary split: Bucket A (in-range) on top, Bucket B (4+ yrs explicit) collapsed.
       A = years ≤3 stated OR unstated.
   • Within A, sort by FIT: freshness → priority sector → NYC/remote → date.
-  • Filter chips: APM · NYC · SF · Remote · Fresh  (match the three geo buckets exactly).
+  • Filter chips: APM · NYC · SF · Remote · Priority  (geo chips match the three geo buckets exactly).
 
 SCRAPER_RULES: every card is rendered straight from pm_roles.csv, which the
 scraper fills only from live ATS JSON. The years line is the verbatim JD sentence
@@ -445,7 +445,7 @@ def build():
     <button class="chip" data-f="nyc"    aria-pressed="false">NYC</button>
     <button class="chip" data-f="sf"     aria-pressed="false">SF</button>
     <button class="chip" data-f="remote" aria-pressed="false">Remote</button>
-    <button class="chip" data-f="fresh"  aria-pressed="false">Fresh</button>
+    <button class="chip" data-f="pri"    aria-pressed="false" title="Entry-level, priority sectors, and founding roles">Priority</button>
   </div>
  </div>
 </header>
@@ -455,7 +455,9 @@ def build():
   <div id="alist">
 {a_cards}
   </div>
-  <div class="empty" id="empty">No roles match these filters.</div>
+  <div class="empty" id="empty">No roles match these filters.<br>
+    <button class="chip" id="clear" style="margin-top:14px">Clear filters</button>
+  </div>
 
 {stretch_block}
 
@@ -498,7 +500,7 @@ def build():
       if (term && !card.dataset.search.includes(term)) ok = false;
       if (ok && roleFilters.length) ok = roleFilters.some(f => card.dataset.role === f);
       if (ok && locFilters.length)  ok = locFilters.some(f => locMatch(card, f));
-      if (ok && active.has('fresh')) ok = card.dataset.age === '0' || card.dataset.src === 'hiringcafe';
+      if (ok && active.has('pri')) ok = card.dataset.pri === '1';
       card.style.display = ok ? '' : 'none';
       if (ok) shown++;
     }});
@@ -521,6 +523,12 @@ def build():
     else               {{ active.add(f);    chip.setAttribute('aria-pressed','true'); }}
     apply();
   }}));
+  document.getElementById('clear').addEventListener('click', () => {{
+    q.value = '';
+    active.clear();
+    chips.forEach(chip => chip.setAttribute('aria-pressed','false'));
+    apply();
+  }});
 }})();
 </script>
 </body></html>"""

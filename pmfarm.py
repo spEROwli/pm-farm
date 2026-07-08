@@ -940,7 +940,10 @@ def _hiringcafe_job(h: dict) -> dict | None:
     company  = (v5.get("company_name")
                 or (h.get("enriched_company_data") or {}).get("name") or "(unknown)")
     location = v5.get("formatted_workplace_location") or ""
-    date_str = datetime.datetime.now(datetime.timezone.utc).isoformat()  # hiring.cafe only surfaces active listings; treat fetch date as post date
+    # Use hiring.cafe's own estimated publish date so the 72h freshness gate is
+    # real. No date → None (unknown), which the strict aggregator freshness rule
+    # drops rather than passing off as fresh.
+    date_str = v5.get("estimated_publish_date") or None
     parts: list[str] = []
     if v5.get("requirements_summary"):
         parts.append(str(v5["requirements_summary"]))
@@ -1144,9 +1147,10 @@ def fetch_yc() -> list[dict]:
         for j in _yc_parse(html):
             if not _passes_title(j["title"]):
                 continue
-            # YC's board only lists currently-open roles and exposes no post date;
-            # treat the fetch date as the post date (same convention as hiring.cafe).
-            date_str = j["date_str"] or datetime.datetime.now(datetime.timezone.utc).isoformat()
+            # Use YC's parsed "X days ago" when present. No date → None (unknown);
+            # the strict aggregator freshness rule drops it rather than faking a
+            # fetch-date so the 72h promise stays real.
+            date_str = j["date_str"]
             job = _make_job("yc", j["company"], j["title"], j["location"],
                             j["url"], j["title"], date_str)
             out.append(job)
@@ -1273,9 +1277,10 @@ def fetch_wellfound() -> list[dict]:
                 continue
             # Include exp + salary text in snippet so _parse_years can gate on it
             snippet = " ".join(filter(None, [j["exp_text"], j["salary_text"], j["title"]]))
-            # Wellfound list pages only show open roles and rarely expose a post date;
-            # fall back to the fetch date (same convention as hiring.cafe).
-            date_str = j["date_str"] or datetime.datetime.now(datetime.timezone.utc).isoformat()
+            # Use Wellfound's parsed "X days ago" when present. No date → None
+            # (unknown); the strict aggregator freshness rule drops it rather than
+            # faking a fetch-date so the 72h promise stays real.
+            date_str = j["date_str"]
             job = _make_job("wellfound", j["company"], j["title"], j["location"],
                             j["url"], snippet, date_str)
             out.append(job)
@@ -1426,11 +1431,16 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
     # they redirect through their own domains rather than the employer's apply page.
 
     # ── freshness filter: drop stale postings with a known age > MAX_AGE_DAYS ──
+    # The board promises roles no older than 72h. For the aggregator sources
+    # (hiring.cafe/yc/wellfound), an unknown age means we could NOT verify the
+    # post date, so we cannot honor that promise — drop it. Direct ATS sources
+    # (Greenhouse/Ashby/Lever) are trusted and kept when undated.
+    _FRESH_STRICT = {"hiring.cafe", "yc", "wellfound"}
     def _too_old(j: dict) -> bool:
         try:
             return int(j["days_old"]) > MAX_AGE_DAYS
         except (ValueError, TypeError):
-            return False   # unknown age → keep (can't judge)
+            return j.get("source", "") in _FRESH_STRICT   # undatable aggregator → can't verify fresh → drop
     stale = [j for j in raw if _too_old(j)]
     if stale:
         print(f"\nDropped {len(stale)} stale role(s) older than {MAX_AGE_DAYS}d "

@@ -188,10 +188,12 @@ LOC_LABEL = {
 }
 
 
-# Sources that do not expose a real post date. We stamp the fetch date
-# internally so active listings still rank well, but we must NOT present that as
-# a post date on the card — doing so would claim a freshness we cannot verify.
-_NO_POSTDATE_SRC = {"hiring.cafe", "yc", "wellfound", "Ashby", "ashby"}
+# Direct ATS sources that genuinely expose no post date. These are trusted
+# (real company career page, currently listed) so they stay on the board, but we
+# must NOT invent a post date — the card shows "listing active" instead. The
+# aggregator sources now carry real dates (or are dropped when undatable), so
+# they are not here.
+_NO_POSTDATE_SRC = {"Ashby", "ashby"}
 
 
 def _age_label(row: dict) -> str:
@@ -461,7 +463,7 @@ def build():
 </header>
 
 <main>
-  <div class="lbl">PM + APM · entry to mid-level · currently open · refreshed daily</div>
+  <div class="lbl">Posted within {MAX_AGE_DAYS * 24}h · PM + APM · entry to mid-level</div>
   <div id="alist">
 {a_cards}
   </div>

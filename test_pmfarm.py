@@ -834,22 +834,30 @@ def test_12_edge_cases():
 def test_13_brightdata_parse():
     header(13, "brightdata hiring.cafe parse path")
 
+    import datetime as _dt
+    # A real recent publish date so the freshness gate can be honest. Default is
+    # one day ago; pass publish_date=None to simulate a hit with no date.
+    _one_day_ago = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=1)).isoformat()
+
     def _make_hit(title="Product Manager", apply_url="https://apply.example.com/123",
                   company="Acme Corp", location="New York, NY",
-                  yoe=2, yoe_not_mentioned=False, reqs="2+ years of product experience"):
+                  yoe=2, yoe_not_mentioned=False, reqs="2+ years of product experience",
+                  publish_date=_one_day_ago):
+        v5 = {
+            "company_name": company,
+            "core_job_title": title,
+            "formatted_workplace_location": location,
+            "min_industry_and_role_yoe": yoe,
+            "is_min_industry_and_role_yoe_not_mentioned": yoe_not_mentioned,
+            "requirements_summary": reqs,
+        }
+        if publish_date is not None:
+            v5["estimated_publish_date"] = publish_date
         return {
             "apply_url": apply_url,
             "job_information": {"title": title},
             "enriched_company_data": {"name": company},
-            "v5_processed_job_data": {
-                "company_name": company,
-                "core_job_title": title,
-                "formatted_workplace_location": location,
-                "estimated_publish_date": "2026-06-20T00:00:00.000Z",
-                "min_industry_and_role_yoe": yoe,
-                "is_min_industry_and_role_yoe_not_mentioned": yoe_not_mentioned,
-                "requirements_summary": reqs,
-            },
+            "v5_processed_job_data": v5,
         }
 
     # Happy path: well-formed hit produces a valid job dict
@@ -859,8 +867,13 @@ def test_13_brightdata_parse():
     check("BD-1 company",                         j["company"],        "Acme Corp")
     check("BD-1 title",                           j["title"],          "Product Manager")
     check("BD-1 url",                             j["url"],            "https://apply.example.com/123")
-    check("BD-1 days_old is today (fetch date used)", j["days_old"],   "0")
+    # days_old is the REAL estimated publish date (1 day ago), not a faked fetch date
+    check("BD-1 days_old from real publish date", j["days_old"],       "1")
     check("BD-1 years_raw parsed from yoe",       j["years_raw"],      "2")
+
+    # No publish date -> days_old unknown (so the strict freshness rule can drop it)
+    j_nodate = pmfarm._hiringcafe_job(_make_hit(publish_date=None))
+    check("BD-1b no publish date -> unknown",    j_nodate["days_old"], "unknown")
 
     # Missing apply_url -> returns None (filtered out)
     j2 = pmfarm._hiringcafe_job(_make_hit(apply_url=""))

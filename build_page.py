@@ -188,7 +188,15 @@ LOC_LABEL = {
 }
 
 
+# Sources that do not expose a real post date. We stamp the fetch date
+# internally so active listings still rank well, but we must NOT present that as
+# a post date on the card — doing so would claim a freshness we cannot verify.
+_NO_POSTDATE_SRC = {"hiring.cafe", "yc", "wellfound", "Ashby", "ashby"}
+
+
 def _age_label(row: dict) -> str:
+    if row.get("source", "") in _NO_POSTDATE_SRC:
+        return "listing active"
     a = _age(row)
     if a == 9999: return "listing active"
     if a == 0:    return "today"
@@ -229,15 +237,17 @@ def _card(row: dict, priority: bool) -> str:
     if row.get("lang_signal") == "YES":  tags.append('<span class="pill pl-lang">lang</span>')
     tagrow = "".join(tags)
 
+    src      = row.get("source", "")
     ystyle   = "ns" if years == "not stated" else "yr"
     age_str  = html.escape(_age_label(row))
-    ab       = _age_bucket(row)
+    # Undated sources get a neutral dot — a "fresh" marker would imply a post
+    # date we do not have.
+    ab       = 1 if src in _NO_POSTDATE_SRC else _age_bucket(row)
     aclass   = ("ag-fresh" if ab == 0 else "ag-recent" if ab == 1 else "ag-stale")
 
     # data-search built from raw (un-escaped) values to avoid double-encoding.
     search   = html.escape((row.get("company", "") + " " + row.get("title", "") + " " + loc_raw).lower(), quote=True)
     hw_attr  = "1" if has_hw else "0"
-    src      = row.get("source", "")
     return f"""  <div class="card{' pri' if priority else ''}{' done' if is_app else ''}" data-loc="{lc}" data-age="{ab}" data-pri="{1 if priority else 0}" data-applied="{1 if is_app else 0}" data-hw="{hw_attr}" data-role="{rt}" data-src="{src}" data-search="{search}">
     <div class="top">
       <div class="co">{company}</div>
@@ -451,7 +461,7 @@ def build():
 </header>
 
 <main>
-  <div class="lbl">Past {MAX_AGE_DAYS * 24} hours · PM + APM · entry to mid-level</div>
+  <div class="lbl">PM + APM · entry to mid-level · currently open · refreshed daily</div>
   <div id="alist">
 {a_cards}
   </div>

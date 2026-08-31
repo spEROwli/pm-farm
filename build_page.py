@@ -302,8 +302,8 @@ def _render_bucket(rows: list) -> str:
     return "\n".join(parts)
 
 
-_PAGE_DESC = ("Live PM board · scraped daily from Greenhouse, Ashby, Lever &amp; hiring.cafe "
-              "· an experiment in using Claude to automate job search")
+_PAGE_DESC = ("PM roles scraped daily from Greenhouse, Ashby, Lever &amp; hiring.cafe "
+              "· filtered for NYC + SF entry-to-mid-level positions")
 
 
 def build():

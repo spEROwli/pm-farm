@@ -1515,21 +1515,28 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
               f"(e.g. {', '.join(sorted({j['company'] for j in over}))[:80]})")
     raw = [j for j in raw if not _over_bar(j)]
 
-    # ── senior title + experience gate: drop senior/staff/principal/director/head/vp
-    #    roles when years are "unknown" OR when stated years > EXPERIENCE_CAP. This
-    #    prevents "Senior PM" with "not stated" years from leaking into the primary
-    #    entry-to-mid-level list. A "Senior Associate PM" with 2 yrs stated still passes.
+    # ── senior title filter: drop ALL senior/staff/principal/director/head/vp roles
+    #    from the primary entry-to-mid-level list, regardless of stated years. Per the
+    #    dashboard promise ("entry to mid-level"), a "Senior PM" should never appear
+    #    even if it lists 1-3 years — that's scope creep. Exception: "Senior Associate PM"
+    #    is kept because it's an entry-level title that happens to contain "senior".
     def _senior_leak(j: dict) -> bool:
         if not _is_senior_title(j["title"]):
             return False
-        # Drop if years unknown or > cap
-        try:
-            return int(j["years_raw"]) > EXPERIENCE_CAP
-        except (ValueError, TypeError):
-            return True   # "unknown" + senior title → drop
+        # Exception: "Senior Associate" or "Sr. Associate" is entry-level, not senior
+        title_lower = j["title"].lower()
+        if "associate" in title_lower and any(marker in title_lower for marker in ["senior", "sr."]):
+            # Check if "senior/sr." comes before "associate" (e.g., "Senior Associate PM" passes)
+            # but "Associate Senior PM" would be dropped (weird but defensive)
+            assoc_idx = title_lower.find("associate")
+            senior_idx = min(title_lower.find("senior") if "senior" in title_lower else 9999,
+                            title_lower.find("sr.") if "sr." in title_lower else 9999)
+            if senior_idx < assoc_idx:
+                return False  # "Senior Associate PM" → keep
+        return True  # All other senior-titled roles → drop
     senior_dropped = [j for j in raw if _senior_leak(j)]
     if senior_dropped:
-        print(f"Dropped {len(senior_dropped)} senior-titled role(s) with unknown or >{EXPERIENCE_CAP}yr reqs "
+        print(f"Dropped {len(senior_dropped)} senior-titled role(s) from entry-to-mid-level list "
               f"(e.g. {', '.join(sorted({f'{j['company']} {j['title'][:30]}' for j in senior_dropped[:3]}))[:120]})")
     raw = [j for j in raw if not _senior_leak(j)]
 

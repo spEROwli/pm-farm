@@ -264,35 +264,45 @@ def test_5b_senior_experience_gate():
         print(f"    {flag}NOT-SR: {title!r}")
         check(f"not_senior/{title}", result, False)
     
-    # Test combined gate: senior title + (unknown OR >3 years) → DROP
-    print("\n  Combined gate (senior title + years):")
+    # Test combined gate: senior title → DROP (regardless of years)
+    # Exception: "Senior Associate PM" is kept (entry-level title)
+    print("\n  Combined gate (senior title filter):")
     
     # Should DROP: senior + unknown years
     senior_unknown = {"title": "Senior Product Manager", "company": "A", "years_raw": "unknown"}
     # Should DROP: senior + 4+ years
     senior_4yr = {"title": "Sr. Product Manager", "company": "B", "years_raw": "4"}
-    # Should KEEP: senior + 2 years (≤ cap)
-    senior_2yr = {"title": "Senior Associate PM", "company": "C", "years_raw": "2"}
+    # Should DROP: senior + 1-3 years (tightened filter)
+    senior_2yr = {"title": "Senior Product Manager", "company": "C", "years_raw": "2"}
+    # Should KEEP: "Senior Associate PM" (entry-level exception)
+    senior_assoc = {"title": "Senior Associate Product Manager", "company": "D", "years_raw": "2"}
     # Should KEEP: non-senior + unknown years
-    plain_unknown = {"title": "Product Manager", "company": "D", "years_raw": "unknown"}
+    plain_unknown = {"title": "Product Manager", "company": "E", "years_raw": "unknown"}
     
     def _leak(j):
         if not pmfarm._is_senior_title(j["title"]):
             return False
-        try:
-            return int(j["years_raw"]) > pmfarm.EXPERIENCE_CAP
-        except (ValueError, TypeError):
-            return True
+        # Exception: "Senior Associate" is entry-level
+        title_lower = j["title"].lower()
+        if "associate" in title_lower and any(marker in title_lower for marker in ["senior", "sr."]):
+            assoc_idx = title_lower.find("associate")
+            senior_idx = min(title_lower.find("senior") if "senior" in title_lower else 9999,
+                            title_lower.find("sr.") if "sr." in title_lower else 9999)
+            if senior_idx < assoc_idx:
+                return False
+        return True
     
-    check("senior+unknown → DROP", _leak(senior_unknown), True)
-    check("senior+4yr → DROP",     _leak(senior_4yr),     True)
-    check("senior+2yr → KEEP",     _leak(senior_2yr),     False)
-    check("plain+unknown → KEEP",  _leak(plain_unknown),  False)
+    check("senior+unknown → DROP",       _leak(senior_unknown), True)
+    check("senior+4yr → DROP",           _leak(senior_4yr),     True)
+    check("senior+2yr → DROP (tighter)", _leak(senior_2yr),     True)
+    check("Senior Associate → KEEP",     _leak(senior_assoc),   False)
+    check("plain+unknown → KEEP",        _leak(plain_unknown),  False)
     
-    print(f"    ok   Senior+unknown → drop={_leak(senior_unknown)}")
-    print(f"    ok   Senior+4yr → drop={_leak(senior_4yr)}")
-    print(f"    ok   Senior+2yr → keep (drop={_leak(senior_2yr)})")
-    print(f"    ok   Plain+unknown → keep (drop={_leak(plain_unknown)})")
+    print(f"    ok   Senior PM+unknown → drop={_leak(senior_unknown)}")
+    print(f"    ok   Senior PM+4yr → drop={_leak(senior_4yr)}")
+    print(f"    ok   Senior PM+2yr → drop={_leak(senior_2yr)} (tightened)")
+    print(f"    ok   Senior Associate PM → keep (drop={_leak(senior_assoc)})")
+    print(f"    ok   Plain PM+unknown → keep (drop={_leak(plain_unknown)})")
 
 
 # ── TEST 6: dead/missing slug returns [] and doesn't halt ────────────────────

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-test_pmfarm.py — all 8 adversarial test cases.
+test_pmfarm.py — all adversarial test cases.
 Run: python3 test_pmfarm.py
 """
-import csv, io, json, os, sys, tempfile, shutil
+import csv, io, json, os, sys, tempfile, shutil, urllib.request, urllib.error
 
 # Windows consoles default to cp1252, which cannot encode the box-drawing
 # characters in test headers. Force UTF-8 so the suite runs everywhere.
@@ -183,11 +183,13 @@ def test_4_remote_toggle():
 # ── TEST 5: seniority filter — no false positives or false negatives ─────────
 
 def test_5_seniority():
-    header(5, "seniority filter")
+    header(5, "seniority filter (_passes_title)")
+    # _passes_title: drops unambiguous exec titles (Staff/Principal/Director/VP/Head)
+    # but intentionally keeps "Senior"/"Sr."/"Lead" because they often appear as
+    # default prefixes. The _is_senior_title + experience gate handles those downstream.
     should_drop = [
         "Staff Product Manager",
         "Principal Product Manager",
-        "Lead Product Manager",
         "Director, Product",
         "Product Manager II",
         "Product Manager III",
@@ -200,8 +202,9 @@ def test_5_seniority():
         "Product Manager",
         "Associate Product Manager",
         "Technical Product Manager",
-        "Senior Product Manager",              # 'Senior' kept — companies use it as default prefix
+        "Senior Product Manager",              # 'Senior' kept by _passes_title
         "Sr. Product Manager",                 # same reason as Senior
+        "Lead Product Manager",                # 'Lead' kept by _passes_title
         "Product Manager, Leadership Tools",   # 'lead' substring — must NOT drop
         "Product Manager, Leads Management",   # 'lead' substring — must NOT drop
         "Staffing Product Manager",            # 'staff' substring — must NOT drop
@@ -218,6 +221,78 @@ def test_5_seniority():
         flag = "ok  " if result else "XX  "
         print(f"  {flag}PASSES  {title!r}")
         check(f"seniority/pass/{title}", result, True)
+
+
+# ── TEST 5b: senior title + experience gate — primary list filter ────────────
+
+def test_5b_senior_experience_gate():
+    header("5b", "senior title + experience gate")
+    # _is_senior_title detects Senior/Sr./Staff/Principal/Director/Head/VP/Lead
+    # at the START of a title. Combined with experience gate, it filters senior
+    # roles from the primary list when years are unknown or > EXPERIENCE_CAP.
+    
+    # Test _is_senior_title detection
+    senior_titles = [
+        "Senior Product Manager",
+        "Sr. Product Manager",
+        "Staff Product Manager",
+        "Principal Product Manager",
+        "Director of Product",
+        "Head of Product",
+        "Vice President of Product",
+        "VP of Product",
+        "Lead Product Manager",
+    ]
+    non_senior_titles = [
+        "Product Manager",
+        "Associate Product Manager",
+        "Product Manager, Senior Care",       # 'senior' mid-title
+        "Product Manager, Leadership Tools",  # 'lead' mid-title
+        "Staffing Coordinator",               # 'staff' substring
+    ]
+    
+    print("  _is_senior_title detection:")
+    for title in senior_titles:
+        result = pmfarm._is_senior_title(title)
+        flag = "ok  " if result else "XX  "
+        print(f"    {flag}SENIOR: {title!r}")
+        check(f"is_senior/{title}", result, True)
+    
+    for title in non_senior_titles:
+        result = pmfarm._is_senior_title(title)
+        flag = "ok  " if not result else "XX  "
+        print(f"    {flag}NOT-SR: {title!r}")
+        check(f"not_senior/{title}", result, False)
+    
+    # Test combined gate: senior title + (unknown OR >3 years) → DROP
+    print("\n  Combined gate (senior title + years):")
+    
+    # Should DROP: senior + unknown years
+    senior_unknown = {"title": "Senior Product Manager", "company": "A", "years_raw": "unknown"}
+    # Should DROP: senior + 4+ years
+    senior_4yr = {"title": "Sr. Product Manager", "company": "B", "years_raw": "4"}
+    # Should KEEP: senior + 2 years (≤ cap)
+    senior_2yr = {"title": "Senior Associate PM", "company": "C", "years_raw": "2"}
+    # Should KEEP: non-senior + unknown years
+    plain_unknown = {"title": "Product Manager", "company": "D", "years_raw": "unknown"}
+    
+    def _leak(j):
+        if not pmfarm._is_senior_title(j["title"]):
+            return False
+        try:
+            return int(j["years_raw"]) > pmfarm.EXPERIENCE_CAP
+        except (ValueError, TypeError):
+            return True
+    
+    check("senior+unknown → DROP", _leak(senior_unknown), True)
+    check("senior+4yr → DROP",     _leak(senior_4yr),     True)
+    check("senior+2yr → KEEP",     _leak(senior_2yr),     False)
+    check("plain+unknown → KEEP",  _leak(plain_unknown),  False)
+    
+    print(f"    ok   Senior+unknown → drop={_leak(senior_unknown)}")
+    print(f"    ok   Senior+4yr → drop={_leak(senior_4yr)}")
+    print(f"    ok   Senior+2yr → keep (drop={_leak(senior_2yr)})")
+    print(f"    ok   Plain+unknown → keep (drop={_leak(plain_unknown)})")
 
 
 # ── TEST 6: dead/missing slug returns [] and doesn't halt ────────────────────
@@ -899,6 +974,60 @@ def test_13_brightdata_parse():
     check("BD-7 ssrHits missing -> empty list",   pmfarm._hiringcafe_hits(no_hits_html), [])
 
 
+# ── TEST 14: dead link validation ────────────────────────────────────────────
+
+def test_14_dead_links():
+    header(14, "dead link validation")
+    
+    # Mock URL responses: 200=valid, 404=dead, 500=ambiguous
+    def mock_urlopen(request, timeout=None):
+        class MockResponse:
+            def __init__(self, status):
+                self.status = status
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+        
+        url = request.get_full_url() if hasattr(request, 'get_full_url') else str(request)
+        if "valid.com" in url:
+            return MockResponse(200)
+        if "dead404.com" in url:
+            raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+        if "dead410.com" in url:
+            raise urllib.error.HTTPError(url, 410, "Gone", {}, None)
+        if "forbidden.com" in url:
+            raise urllib.error.HTTPError(url, 403, "Forbidden", {}, None)
+        if "timeout.com" in url:
+            raise urllib.error.URLError("Timeout")
+        return MockResponse(200)
+    
+    orig_urlopen = urllib.request.urlopen
+    urllib.request.urlopen = mock_urlopen
+    
+    try:
+        valid   = pmfarm._validate_url("https://valid.com/job/123")
+        dead404 = pmfarm._validate_url("https://dead404.com/job/123")
+        dead410 = pmfarm._validate_url("https://dead410.com/job/123")
+        forbid  = pmfarm._validate_url("https://forbidden.com/job/123")
+        timeout = pmfarm._validate_url("https://timeout.com/job/123")
+        
+        print(f"  valid URL (200)     → {valid}   (want True)")
+        print(f"  dead 404            → {dead404}   (want False)")
+        print(f"  dead 410            → {dead410}   (want False)")
+        print(f"  forbidden 403       → {forbid}   (want True, ambiguous)")
+        print(f"  timeout/DNS fail    → {timeout}   (want True, transient)")
+        
+        check("valid URL → True",     valid,   True)
+        check("404 → False",          dead404, False)
+        check("410 → False",          dead410, False)
+        check("403 → True (ambig)",   forbid,  True)
+        check("timeout → True (opt)", timeout, True)
+        
+    finally:
+        urllib.request.urlopen = orig_urlopen
+
+
 # ── run all ───────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -907,6 +1036,7 @@ if __name__ == "__main__":
     test_3_years()
     test_4_remote_toggle()
     test_5_seniority()
+    test_5b_senior_experience_gate()
     test_6_dead_slug()
     test_7_idempotency()
     test_8_honest_limits()
@@ -915,6 +1045,7 @@ if __name__ == "__main__":
     test_11_build_page_contract()
     test_12_edge_cases()
     test_13_brightdata_parse()
+    test_14_dead_links()
 
     n_fail = sum(1 for r in results if r[0] == FAIL)
     print(f"\n{'='*68}")

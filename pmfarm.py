@@ -1536,8 +1536,9 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
         return True  # All other senior-titled roles → drop
     senior_dropped = [j for j in raw if _senior_leak(j)]
     if senior_dropped:
+        examples = sorted({f"{j['company']} {j['title'][:30]}" for j in senior_dropped[:3]})
         print(f"Dropped {len(senior_dropped)} senior-titled role(s) from entry-to-mid-level list "
-              f"(e.g. {', '.join(sorted({f'{j['company']} {j['title'][:30]}' for j in senior_dropped[:3]}))[:120]})")
+              f"(e.g. {', '.join(examples)[:120]})")
     raw = [j for j in raw if not _senior_leak(j)]
 
     # ── location filter (unknown excluded by default — P2) ───────────────────

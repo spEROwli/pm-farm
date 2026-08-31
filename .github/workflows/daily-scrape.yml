@@ -20,6 +20,12 @@ jobs:
         with:
           python-version: '3.11'
 
+      # Fails in ~1s on syntax not supported by the pinned Python, which is
+      # otherwise invisible locally on newer interpreters and silent in the
+      # continue-on-error discovery steps below.
+      - name: Syntax check
+        run: python3 -m compileall -q .
+
       - name: Expand company list (YC directory)
         run: python3 discover.py
         continue-on-error: true

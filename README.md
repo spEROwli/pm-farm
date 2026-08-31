@@ -10,7 +10,7 @@ PM Farm is a job-search intelligence pipeline that pulls Product Manager and Ass
 
 - Pulls roles from five keyless hiring APIs: Greenhouse, Ashby, Lever, Workable, and The Muse.
 - Adds hiring.cafe, YC Jobs, and Wellfound when a Bright Data key is configured. Without a key they stay inert and cost nothing, so the public dashboard runs on the five above.
-- Filters to PM and APM roles in New York City, San Francisco, and U.S. remote.
+- Filters to PM and APM roles in New York City and San Francisco. A role that also offers remote still counts; US-wide remote postings with no city attached do not.
 - Prioritizes recent postings.
 - Removes obvious seniority mismatches.
 - Deduplicates repeated listings.

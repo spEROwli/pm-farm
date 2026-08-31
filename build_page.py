@@ -312,14 +312,42 @@ def _render_bucket(rows: list) -> str:
     return "\n".join(parts)
 
 
-_PAGE_DESC = ("Live aggregator of PM roles from Greenhouse, Ashby, Lever, and other ATS · "
-              "filtered to NYC, SF, and U.S. remote · entry to mid-level")
+_SOURCE_LABELS = {
+    "greenhouse":  "Greenhouse",
+    "ashby":       "Ashby",
+    "lever":       "Lever",
+    "workable":    "Workable",
+    "muse":        "The Muse",
+    "hiring.cafe": "hiring.cafe",
+    "yc":          "YC Jobs",
+    "wellfound":   "Wellfound",
+    "adzuna":      "Adzuna",
+}
+
+_DESC_TAIL = "· filtered to NYC, SF, and U.S. remote · entry to mid-level"
+
+
+def _page_desc(rows: list) -> str:
+    """Name only the sources that actually produced these roles.
+
+    Static copy goes stale silently: a missing Bright Data key drops three
+    sources to inert, and the page would still claim them. SCRAPER_RULES applies
+    to the page copy too, not just the cards.
+    """
+    seen = {(r.get("source") or "").strip().lower() for r in rows}
+    names = [label for key, label in _SOURCE_LABELS.items() if key in seen]
+    names += [html.escape(s) for s in sorted(seen - set(_SOURCE_LABELS)) if s]
+    if not names:
+        return f"Live aggregator of PM roles from hiring APIs {_DESC_TAIL}"
+    joined = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " &amp; " + names[-1]
+    return f"Live aggregator of PM roles from {joined} {_DESC_TAIL}"
 
 
 def build():
     if not os.path.exists(CSV_IN):
-        sys.exit(f"No {CSV_IN}. Run: python3 pmfarm.py local --all-levels")
+        sys.exit(f"No {CSV_IN}. Run: python3 pmfarm.py")
     rows = list(csv.DictReader(open(CSV_IN, newline="", encoding="utf-8")))
+    page_desc = _page_desc(rows)
     if rows and "years_sentence" not in rows[0]:
         print("WARNING: pm_roles.csv has no years_sentence column. Years will show "
               "'not stated'. Regenerate with the updated pmfarm.py for verbatim JD "
@@ -347,7 +375,7 @@ def build():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <meta property="og:title" content="PM Roles — Live Board">
-<meta property="og:description" content="{_PAGE_DESC}">
+<meta property="og:description" content="{page_desc}">
 <meta property="og:url" content="https://sperowli.github.io/pm-farm/pm_roles.html">
 <title>PM Roles — {today}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -472,7 +500,7 @@ def build():
     <div class="hbrand"><h1>PM Roles</h1><span class="subtitle">updated {today}</span></div>
     <span class="count" id="count">{len(bucket_a)} shown</span>
   </div>
-  <p class="hdesc">{_PAGE_DESC}</p>
+  <p class="hdesc">{page_desc}</p>
   <input class="search" id="q" type="search" placeholder="Search company, title, location…" autocomplete="off">
   <div class="chips" id="chips">
     <button class="chip" data-f="apm"    aria-pressed="false">APM</button>

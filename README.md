@@ -4,8 +4,6 @@ PM Farm is a job-search intelligence pipeline that pulls Product Manager and Ass
 
 **[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)** · **[Case study](CASE_STUDY.md)**
 
-> Built with Claude Code as an execution layer. I defined the workflow, requirements, filtering rules, validation criteria, and iteration loop.
-
 ---
 
 ## What it does

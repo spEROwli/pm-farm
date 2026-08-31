@@ -209,17 +209,36 @@ TITLE_MUST_INCLUDE, _WIDE_TITLE_MODE = _load_title_includes()
 TITLE_EXCLUDE = (["marketing", "product marketing", "product designer"]
                  + ([] if _WIDE_TITLE_MODE else ["product analyst"]))
 
-# Executive/org-layer titles dropped on the title alone. "Senior" and "Sr" are
-# intentionally NOT in this list — many companies use them as default prefixes
-# (e.g. "Senior Associate PM") without implying an elevated experience bar. The
-# years gate (EXPERIENCE_CAP) handles those. Mid-title occurrences never gate
-# (e.g. "Product Manager, Senior Care" passes). PM levels II/III caught at END.
+# Executive/org-layer titles dropped on the title alone for PM-only mode.
+# This regex catches unambiguous executive titles (Chief, Distinguished, VP, etc.)
+# and PM level suffixes (II/III/IV). It intentionally excludes "Senior"/"Sr." and
+# "Lead" from the HARD gate because they appear as default prefixes in many entry-level
+# titles (e.g. "Senior Associate PM"). The _is_senior_title function below provides
+# a separate, more aggressive gate that DOES catch Senior/Sr./Lead and is used in
+# combination with the experience bar to filter the primary dashboard.
 _HARD_SENIOR_RE = re.compile(
-    r'^\s*(?:staff|principal|lead|group|head|chief|distinguished|'
+    r'^\s*(?:staff|principal|group|head|chief|distinguished|'
     r'director|managing\s+director|vice\s+president|vp|svp|evp)\b'
     r'|\b(?:iv|iii|ii)\b(?=\s*(?:[,\-–—]|$))',
     re.IGNORECASE,
 )
+
+# Seniority markers for primary dashboard filter. Roles with these titles AND
+# (years > EXPERIENCE_CAP OR years = "unknown") are dropped from the primary list
+# to prevent senior roles from dominating the entry-to-mid-level board. "Lead"
+# only matches at the start to avoid false positives like "Product Lead Generation".
+_SENIOR_TITLE_RE = re.compile(
+    r'^\s*(?:senior|sr\.|staff|principal|director|head|'
+    r'vice\s+president|vp|lead)\s+',
+    re.IGNORECASE,
+)
+
+
+def _is_senior_title(title: str) -> bool:
+    """True if title starts with a seniority marker (Senior, Sr., Staff, Principal,
+    Director, Head, VP, Vice President, Lead). Used in combination with experience
+    gate to filter senior roles from the primary dashboard."""
+    return bool(_SENIOR_TITLE_RE.search(title))
 
 # Experience bar (parametric knob). Keep roles requiring <= this many years, plus
 # any role with no stated requirement. Roles explicitly requiring MORE are dropped
@@ -648,6 +667,40 @@ def _passes_location(lc: str, remote_only: bool, include_unknown: bool = False) 
 
 def _ct_key(company: str, title: str) -> str:
     return f"{company.strip().lower()}|{title.strip().lower()}"
+
+
+def _validate_url(url: str, timeout: int = 8) -> bool:
+    """Return True if the URL responds with HTTP 200-399, False if 404/410/timeout.
+    Uses HEAD request first (cheaper), falls back to GET if HEAD is not supported.
+    Logs dropped URLs to stderr. Never invents replacement URLs per SCRAPER_RULES."""
+    if not url:
+        return False
+    try:
+        req = urllib.request.Request(url, method="HEAD",
+                                     headers={"User-Agent": "pmfarm/3.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return 200 <= r.status < 400
+    except urllib.error.HTTPError as e:
+        if e.code in (404, 410):
+            print(f"  [dead-link] {e.code} {url}", file=sys.stderr)
+            return False
+        # Other HTTP errors (401, 403, 500, etc.) are ambiguous — the role might
+        # exist but be gated. Optimistically keep it rather than false-negative drop.
+        return True
+    except Exception:
+        # HEAD not supported or timeout — try GET (some servers reject HEAD)
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "pmfarm/3.0"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return 200 <= r.status < 400
+        except urllib.error.HTTPError as e:
+            if e.code in (404, 410):
+                print(f"  [dead-link] {e.code} {url}", file=sys.stderr)
+                return False
+            return True   # ambiguous error → optimistic keep
+        except Exception:
+            # Network timeout / DNS failure → keep (might be transient)
+            return True
 
 
 def _normalize_company(name: str) -> str:
@@ -1462,6 +1515,31 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
               f"(e.g. {', '.join(sorted({j['company'] for j in over}))[:80]})")
     raw = [j for j in raw if not _over_bar(j)]
 
+    # ── senior title filter: drop ALL senior/staff/principal/director/head/vp roles
+    #    from the primary entry-to-mid-level list, regardless of stated years. Per the
+    #    dashboard promise ("entry to mid-level"), a "Senior PM" should never appear
+    #    even if it lists 1-3 years — that's scope creep. Exception: "Senior Associate PM"
+    #    is kept because it's an entry-level title that happens to contain "senior".
+    def _senior_leak(j: dict) -> bool:
+        if not _is_senior_title(j["title"]):
+            return False
+        # Exception: "Senior Associate" or "Sr. Associate" is entry-level, not senior
+        title_lower = j["title"].lower()
+        if "associate" in title_lower and any(marker in title_lower for marker in ["senior", "sr."]):
+            # Check if "senior/sr." comes before "associate" (e.g., "Senior Associate PM" passes)
+            # but "Associate Senior PM" would be dropped (weird but defensive)
+            assoc_idx = title_lower.find("associate")
+            senior_idx = min(title_lower.find("senior") if "senior" in title_lower else 9999,
+                            title_lower.find("sr.") if "sr." in title_lower else 9999)
+            if senior_idx < assoc_idx:
+                return False  # "Senior Associate PM" → keep
+        return True  # All other senior-titled roles → drop
+    senior_dropped = [j for j in raw if _senior_leak(j)]
+    if senior_dropped:
+        print(f"Dropped {len(senior_dropped)} senior-titled role(s) from entry-to-mid-level list "
+              f"(e.g. {', '.join(sorted({f'{j['company']} {j['title'][:30]}' for j in senior_dropped[:3]}))[:120]})")
+    raw = [j for j in raw if not _senior_leak(j)]
+
     # ── location filter (unknown excluded by default — P2) ───────────────────
     unknown_count = sum(1 for j in raw if j["loc_class"] == "unknown")
     filtered = [j for j in raw if _passes_location(j["loc_class"], remote_only, include_unknown_loc)]
@@ -1523,6 +1601,19 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
             print(f"    <- {ev_str}")
         if len(gmail_skipped) > 10:
             print(f"  … and {len(gmail_skipped) - 10} more")
+
+    # ── dead link validation: HEAD/GET check before emitting roles ────────────
+    # Drop roles whose apply URL returns 404 or 410 (gone). Per SCRAPER_RULES,
+    # never invent replacement URLs — a dead link means the role is dropped.
+    print("\nValidating apply URLs (this may take a moment)...")
+    pre_validate = len(jobs)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        validations = {job["url"]: pool.submit(_validate_url, job["url"]) for job in jobs}
+        valid_urls = {url for url, fut in validations.items() if fut.result()}
+    jobs = [j for j in jobs if j["url"] in valid_urls]
+    dead_count = pre_validate - len(jobs)
+    if dead_count:
+        print(f"Dropped {dead_count} role(s) with dead apply links (404/410)")
 
     _NYC_CLASSES = {"nyc", "remote+nyc", "nyc+sf", "remote+nyc+sf"}
     _SF_CLASSES  = {"sf",  "remote+sf",  "nyc+sf", "remote+nyc+sf"}

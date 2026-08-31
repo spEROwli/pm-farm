@@ -13,7 +13,7 @@ Modes:
 
 Requires local/non-container execution — the container blocks outbound HTTP to
 ATS boards. Run this on your laptop once a week to expand the slug cache, then
-commit verified_companies.json and it's available in every future Claude Code run.
+commit verified_companies.json and it's available in every future run.
 
 Discovery pipeline (all modes):
   1. Fetch company names from the source

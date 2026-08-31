@@ -143,14 +143,20 @@ def _loc_rank(lc: str) -> int:
 
 
 def _geo_rank(lc: str) -> int:
-    """Primary geo bucket: NYC first, SF second, remote third, international last."""
-    if lc in ("nyc", "remote+nyc", "nyc+sf", "remote+nyc+sf"):
+    """Primary geo bucket for NYC-first job search: NYC → SF → hybrid → remote-only → intl.
+    Pure 'remote' (US-remote-only, no city) is de-prioritized so the first screen shows
+    concrete office locations first (NYC/SF roles), not a wall of remote-only listings."""
+    if lc == "nyc":
         return 0
-    if lc in ("sf", "remote+sf"):
+    if lc == "sf":
         return 1
+    if lc in ("nyc+sf", "remote+nyc", "remote+sf", "remote+nyc+sf"):
+        return 2   # hybrid: city + remote
+    if lc == "remote":
+        return 3   # pure remote-only (de-prioritized)
     if lc == "international":
-        return 3
-    return 2
+        return 4
+    return 5       # unknown
 
 
 def _age(row: dict) -> int:
@@ -263,7 +269,13 @@ def _card(row: dict, priority: bool) -> str:
   </div>"""
 
 
-_GEO_LABEL = {0: "New York City", 1: "San Francisco", 2: "Remote"}
+_GEO_LABEL = {
+    0: "New York City",
+    1: "San Francisco", 
+    2: "Hybrid (NYC/SF + Remote)",
+    3: "Remote (US-wide)",
+    4: "International"
+}
 
 
 def _render_bucket(rows: list) -> str:
@@ -290,8 +302,8 @@ def _render_bucket(rows: list) -> str:
     return "\n".join(parts)
 
 
-_PAGE_DESC = ("Live PM board · scraped daily from Greenhouse, Ashby, Lever &amp; hiring.cafe "
-              "· an experiment in using Claude to automate job search")
+_PAGE_DESC = ("PM roles scraped daily from Greenhouse, Ashby, Lever &amp; hiring.cafe "
+              "· filtered for NYC + SF entry-to-mid-level positions")
 
 
 def build():

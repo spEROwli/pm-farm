@@ -60,9 +60,6 @@ The main lesson was to separate the mechanism from the product. The scraper is t
 
 The project became better when I narrowed it around the workflow instead of adding more features. For this use case, a focused reliable tool was more useful than a broader platform.
 
-## Possible next steps
+## Version 1 Status
 
-- Add freshness filters for 1, 3, 7, and 14 day windows.
-- Add lightweight company tags.
-- Add shareable search URLs.
-- Add a short daily digest for newly added roles.
+This version is complete as a daily PM/APM triage board demonstrating source aggregation, rule-based filtering, and automated publishing. Feature expansion is not planned.

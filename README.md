@@ -91,12 +91,9 @@ python3 test_pmfarm.py
 
 Python 3.11+ · standard library · GitHub Actions · GitHub Pages · static HTML
 
-### Possible next steps
+### Version 1 Status
 
-- Add freshness filters for 1, 3, 7, and 14 day windows.
-- Add lightweight company tags.
-- Add shareable search URLs.
-- Add a short daily digest.
+This version is feature-complete as a daily PM/APM triage board. Additional filtering, tagging, or digest features are out of scope for this portfolio demonstration.
 
 </details>
 

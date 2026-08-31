@@ -64,14 +64,24 @@ def _years_num(years_raw: str):
 # Phrases that turn a stated years number into a soft preference, not a hard
 # floor. Read verbatim from the JD sentence — not inferred. A role with ">3 yrs"
 # but a hedge belongs in the open pile; the sentence on the card lets you decide.
-_HEDGE = ("preferred", "or equivalent", "equivalent experience", "equivalent work",
-          "nice to have", "ideally", "a plus", "bonus", "not required",
+# However, hedges do NOT soften requirements over 3 years for an entry-level board.
+_HEDGE = ("preferred", "nice to have", "ideally", "a plus", "bonus", "not required",
           "not strictly", "we welcome", "we encourage")
 
 
 def _years_is_soft(row: dict) -> bool:
     s = (row.get("years_sentence") or "").lower()
-    return any(h in s for h in _HEDGE)
+    # "Equivalent experience" language only softens bars at or below the cap (3 years).
+    # A "5+ years or equivalent" is still a 5-year bar for entry-level filtering.
+    if any(h in s for h in _HEDGE):
+        return True
+    if any(equiv in s for equiv in ("or equivalent", "equivalent experience", "equivalent work")):
+        # Check if the years mentioned are over the cap
+        nums = [int(m) for m in _SENTENCE_YR.findall(s)]
+        if nums and max(nums) > 3:
+            return False  # High year count + "equivalent" is still a hard bar
+        return True  # Low year count + "equivalent" is soft
+    return False
 
 
 _ROLE_TYPE_MAP = [
@@ -290,8 +300,8 @@ def _render_bucket(rows: list) -> str:
     return "\n".join(parts)
 
 
-_PAGE_DESC = ("Live PM board · scraped daily from Greenhouse, Ashby, Lever &amp; hiring.cafe "
-              "· an experiment in using Claude to automate job search")
+_PAGE_DESC = ("Live aggregator of PM roles from Greenhouse, Ashby, Lever, and other ATS · "
+              "filtered to NYC, SF, and U.S. remote · entry to mid-level")
 
 
 def build():

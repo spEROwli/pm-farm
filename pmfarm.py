@@ -276,6 +276,8 @@ _INTL_MARKERS = [
     "japan", "tokyo", "singapore", "india", "bangalore", "bengaluru",
     "australia", "sydney", "melbourne", "brazil", "sao paulo", "mexico",
     "hungary", "budapest", "israel", "tel aviv", "philippines", "manila",
+    "estonia", "tallinn", "latvia", "riga", "lithuania", "vilnius",
+    "czech republic", "prague", "romania", "bucharest", "bulgaria", "sofia",
 ]
 
 # Keywords in description that signal the role values engineering background.

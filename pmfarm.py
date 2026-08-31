@@ -297,6 +297,49 @@ _INTL_MARKERS = [
     "hungary", "budapest", "israel", "tel aviv", "philippines", "manila",
 ]
 
+# A curated metro list only catches the countries someone thought to add, so
+# "Remote - Estonia" read as US-remote and shipped to the dashboard. Enumerating
+# countries closes the whole class instead of one leak at a time.
+# Deliberately absent: "georgia" and "puerto rico" — a US state and a US
+# territory, already claimed by _US_NON_NYC and REMOTE_LOCS respectively.
+_INTL_COUNTRIES = [
+    "afghanistan", "albania", "algeria", "andorra", "angola", "argentina",
+    "armenia", "austria", "azerbaijan", "bahamas", "bahrain", "bangladesh",
+    "barbados", "belarus", "belgium", "belize", "benin", "bhutan", "bolivia",
+    "bosnia", "botswana", "brunei", "bulgaria", "burkina faso", "burundi",
+    "cambodia", "cameroon", "cape verde", "chad", "chile", "china", "colombia",
+    "comoros", "congo", "costa rica", "croatia", "cuba", "cyprus", "czechia",
+    "czech republic", "denmark", "djibouti", "dominican republic", "ecuador",
+    "egypt", "el salvador", "eritrea", "estonia", "eswatini", "ethiopia",
+    "fiji", "finland", "gabon", "gambia", "ghana", "greece", "guatemala",
+    "guinea", "guyana", "haiti", "honduras", "hong kong", "iceland",
+    "indonesia", "iran", "iraq", "ivory coast", "jamaica", "jordan",
+    "kazakhstan", "kenya", "kosovo", "kuwait", "kyrgyzstan", "laos", "latvia",
+    "lebanon", "lesotho", "liberia", "libya", "liechtenstein", "lithuania",
+    "luxembourg", "madagascar", "malawi", "malaysia", "maldives", "mali",
+    "malta", "mauritania", "mauritius", "moldova", "monaco", "mongolia",
+    "montenegro", "morocco", "mozambique", "myanmar", "namibia", "nepal",
+    "new zealand", "nicaragua", "niger", "nigeria", "north korea",
+    "north macedonia", "norway", "oman", "pakistan", "palestine", "panama",
+    "papua new guinea", "paraguay", "peru", "qatar", "romania", "russia",
+    "rwanda", "saudi arabia", "senegal", "serbia", "seychelles",
+    "sierra leone", "slovakia", "slovenia", "somalia", "south africa",
+    "south korea", "south sudan", "sri lanka", "sudan", "suriname", "syria",
+    "taiwan", "tajikistan", "tanzania", "thailand", "togo", "trinidad",
+    "tunisia", "turkey", "turkmenistan", "uganda", "ukraine",
+    "united arab emirates", "uae", "uruguay", "uzbekistan", "venezuela",
+    "vietnam", "yemen", "zambia", "zimbabwe",
+    # multi-country regions and non-US shorthands seen in location fields
+    "scotland", "wales", "northern ireland", "uk", "europe", "asia", "africa",
+    "latam", "latin america", "middle east", "dubai", "abu dhabi",
+]
+
+# Word-boundary matching: a bare substring test reads "Indiana" as "India",
+# "Romania" as "Oman", and "Chadds Ford" as "Chad".
+_INTL_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(m) for m in _INTL_MARKERS + _INTL_COUNTRIES) + r")\b"
+)
+
 # Keywords in description that signal the role values engineering background.
 # Surfaced in terminal output as a "signal" flag — not used for filtering.
 HARDWARE_SIGNAL = [
@@ -585,7 +628,8 @@ def _loc_class(location: str, snippet: str = "") -> str:
 
     # A named foreign country/region makes this international unless it also names
     # a target city — "London + San Francisco" is still a SF role.
-    has_intl = any(m in loc_lower for m in _INTL_MARKERS)
+    # "New Mexico" is a US state; drop it before the scan so "mexico" can't claim it.
+    has_intl = bool(_INTL_RE.search(loc_lower.replace("new mexico", "")))
     if has_intl and not has_nyc and not has_sf:
         return "international"
 

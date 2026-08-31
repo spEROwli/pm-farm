@@ -195,6 +195,9 @@ def test_5_seniority():
         "VP of Product",
         "Vice President of Product",
         "Head of Product",
+        "Sr. Principal Product Manager",     # org-layer keyword even with Sr. prefix
+        "Senior Principal Product Manager",  # org-layer keyword even with Senior prefix
+        "Senior Staff Product Manager",      # org-layer keyword even with Senior prefix
     ]
     should_pass = [
         "Product Manager",

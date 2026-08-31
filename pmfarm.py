@@ -212,10 +212,12 @@ TITLE_EXCLUDE = (["marketing", "product marketing", "product designer"]
 # Executive/org-layer titles dropped on the title alone. "Senior" and "Sr" are
 # intentionally NOT in this list — many companies use them as default prefixes
 # (e.g. "Senior Associate PM") without implying an elevated experience bar. The
-# years gate (EXPERIENCE_CAP) handles those. Mid-title occurrences never gate
+# years gate (EXPERIENCE_CAP) handles those. However, org-layer keywords (Staff,
+# Principal, Director, etc.) drop even when prefixed with Senior/Sr. — "Senior
+# Principal PM" is still a Principal role. Mid-title occurrences never gate
 # (e.g. "Product Manager, Senior Care" passes). PM levels II/III caught at END.
 _HARD_SENIOR_RE = re.compile(
-    r'^\s*(?:staff|principal|lead|group|head|chief|distinguished|'
+    r'^\s*(?:(?:senior|sr\.?)\s+)?(?:staff|principal|lead|group|head|chief|distinguished|'
     r'director|managing\s+director|vice\s+president|vp|svp|evp)\b'
     r'|\b(?:iv|iii|ii)\b(?=\s*(?:[,\-–—]|$))',
     re.IGNORECASE,

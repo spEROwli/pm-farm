@@ -2,10 +2,10 @@
 """
 pmfarm.py — role scraper: Greenhouse · Ashby · Lever (· hiring.cafe via Bright Data)
 
-  python3 pmfarm.py [--remote-only] [--include-unknown-loc]
+  python3 pmfarm.py [--include-unknown-loc]
 
 Targets: Product Manager · Associate Product Manager (APM) only.
-NYC hard constraint + US remote. Experience bar: 0-3 yrs stated or unstated.
+NYC and SF only — no US-wide remote. Experience bar: 0-3 yrs stated or unstated.
 All data comes from live ATS JSON APIs. See SCRAPER_RULES.md.
 Dedupe: gmail_applied.txt (primary) + applied.csv (fallback).
 """
@@ -281,6 +281,12 @@ _INTL_MARKERS = [
     "estonia", "tallinn", "latvia", "riga", "lithuania", "vilnius",
     "czech republic", "prague", "romania", "bucharest", "bulgaria", "sofia",
 ]
+
+# Word-boundary matching: a bare substring test reads "Indiana" as "India",
+# "Romania" as "Oman", and "Chadds Ford" as "Chad".
+_INTL_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(m) for m in _INTL_MARKERS) + r")\b"
+)
 
 # Keywords in description that signal the role values engineering background.
 # Surfaced in terminal output as a "signal" flag — not used for filtering.
@@ -570,7 +576,8 @@ def _loc_class(location: str, snippet: str = "") -> str:
 
     # A named foreign country/region makes this international unless it also names
     # a target city — "London + San Francisco" is still a SF role.
-    has_intl = any(m in loc_lower for m in _INTL_MARKERS)
+    # "New Mexico" is a US state; drop it before the scan so "mexico" can't claim it.
+    has_intl = bool(_INTL_RE.search(loc_lower.replace("new mexico", "")))
     if has_intl and not has_nyc and not has_sf:
         return "international"
 
@@ -639,12 +646,15 @@ def _passes_title(title: str) -> bool:
     return True
 
 
-def _passes_location(lc: str, remote_only: bool, include_unknown: bool = False) -> bool:
-    if remote_only:
-        allowed = {"remote", "remote+nyc", "remote+sf", "remote+nyc+sf"}
-    else:
-        allowed = {"remote", "remote+nyc", "nyc",
-                   "sf", "remote+sf", "nyc+sf", "remote+nyc+sf"}
+def _passes_location(lc: str, include_unknown: bool = False) -> bool:
+    """NYC and SF are the only target geographies.
+
+    A role qualifies by naming one of those cities. Offering remote on top of
+    that is metadata, not a way in: unanchored "remote" postings are US-wide
+    noise, and they were the only bucket where a foreign posting could reach the
+    board by matching "remote" before anything checked the country.
+    """
+    allowed = {"nyc", "sf", "nyc+sf", "remote+nyc", "remote+sf", "remote+nyc+sf"}
     if include_unknown:
         allowed.add("unknown")
     return lc in allowed
@@ -837,7 +847,7 @@ def fetch_workable(slug: str) -> list[dict]:
             continue
         city = (j.get("location") or {}).get("city", "")
         lc   = _loc_class(city)
-        if not _passes_location(lc, False):
+        if not _passes_location(lc):
             continue
         out.append(_make_job(
             "workable", slug, title, city,
@@ -873,7 +883,7 @@ def fetch_muse() -> list[dict]:
             lc      = _loc_class(locs)
             if not _passes_title(title):
                 continue
-            if not _passes_location(lc, False, True):
+            if not _passes_location(lc, True):
                 continue
             out.append(_make_job(
                 "muse", company, title, locs,
@@ -1347,7 +1357,7 @@ def _output(jobs: list[dict], skipped: int = 0):
 
 # ── local mode ────────────────────────────────────────────────────────────────
 
-def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
+def cmd_local(include_unknown_loc: bool = False):
     _slug_resolution.clear()
 
     # ── Gmail company-level dedupe (OFF by default — see GMAIL_DEDUPE) ─────────
@@ -1468,9 +1478,9 @@ def cmd_local(remote_only: bool, include_unknown_loc: bool = False):
 
     # ── location filter (unknown excluded by default — P2) ───────────────────
     unknown_count = sum(1 for j in raw if j["loc_class"] == "unknown")
-    filtered = [j for j in raw if _passes_location(j["loc_class"], remote_only, include_unknown_loc)]
+    filtered = [j for j in raw if _passes_location(j["loc_class"], include_unknown_loc)]
     excluded_unknown = sum(1 for j in raw if j["loc_class"] == "unknown"
-                          and not _passes_location("unknown", remote_only, include_unknown_loc))
+                          and not _passes_location("unknown", include_unknown_loc))
 
     # ── applied.csv URL/name dedupe (fallback, manual) ────────────────────────
     applied = _load_applied()
@@ -1565,13 +1575,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    p.add_argument("--remote-only", action="store_true",
-                   help="Remote/US-wide roles only; drop NYC-specific listings")
     p.add_argument("--include-unknown-loc", action="store_true",
                    help="Include roles whose location could not be classified")
     args = p.parse_args()
 
-    cmd_local(args.remote_only, args.include_unknown_loc)
+    cmd_local(args.include_unknown_loc)
 
 
 if __name__ == "__main__":

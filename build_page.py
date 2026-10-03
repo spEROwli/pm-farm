@@ -8,8 +8,8 @@ build_page.py — Turn pm_roles.csv into a triage-first apply page.
 Layout:
   • Primary split: Bucket A (in-range) on top, Bucket B (4+ yrs explicit) collapsed.
       A = years ≤3 stated OR unstated.
-  • Within A, sort by FIT: freshness → priority sector → NYC/remote → date.
-  • Filter chips: APM · NYC · SF · Remote · Priority  (geo chips match the three geo buckets exactly).
+  • Within A, sort by FIT: freshness → priority sector → NYC/SF → date.
+  • Filter chips: APM · NYC · SF · Priority  (geo chips match the geo buckets exactly).
 
 SCRAPER_RULES: every card is rendered straight from pm_roles.csv, which the
 scraper fills only from live ATS JSON. The years line is the verbatim JD sentence
@@ -148,22 +148,19 @@ def _loc_rank(lc: str) -> int:
     return {
         "nyc": 0, "sf": 0, "nyc+sf": 0,
         "remote+nyc": 1, "remote+sf": 1, "remote+nyc+sf": 1,
-        "remote": 2, "international": 3, "unknown": 4,
+        "international": 3, "unknown": 4,
     }.get(lc, 5)
 
 
 def _geo_rank(lc: str) -> int:
-    """Primary geo bucket for NYC-first job search: NYC → SF → hybrid → remote-only → intl.
-    Pure 'remote' (US-remote-only, no city) is de-prioritized so the first screen shows
-    concrete office locations first (NYC/SF roles), not a wall of remote-only listings."""
+    """Primary geo bucket for an NYC-first search: NYC → SF → both cities.
+    US-wide remote is not a target geography, so the scraper never emits it."""
     if lc == "nyc":
         return 0
     if lc == "sf":
         return 1
     if lc in ("nyc+sf", "remote+nyc", "remote+sf", "remote+nyc+sf"):
-        return 2   # hybrid: city + remote
-    if lc == "remote":
-        return 3   # pure remote-only (de-prioritized)
+        return 2   # named both cities, or a city that also offers remote
     if lc == "international":
         return 4
     return 5       # unknown
@@ -184,7 +181,7 @@ def _age_bucket(row: dict) -> int:
 
 
 def _fit_key(row: dict) -> tuple:
-    # geo block (NYC→SF→Remote) → entry-level first → priority sector → seniority → date
+    # geo block (NYC→SF→both) → entry-level first → priority sector → seniority → date
     lc = row.get("loc_class", "")
     return (_geo_rank(lc), 0 if _is_priority(row) else 1, _seniority_rank(row), _age(row))
 
@@ -197,7 +194,7 @@ def _years_line(row: dict) -> str:
 
 
 LOC_LABEL = {
-    "nyc": "NYC", "remote+nyc": "NYC / Remote", "remote": "Remote",
+    "nyc": "NYC", "remote+nyc": "NYC / Remote",
     "sf": "SF", "remote+sf": "SF / Remote", "nyc+sf": "NYC / SF",
     "remote+nyc+sf": "NYC / SF / Remote",
     "international": "International", "unknown": "Location n/a",
@@ -223,7 +220,7 @@ def _age_label(row: dict) -> str:
 
 
 LOC_PILL = {
-    "nyc": "NYC", "remote+nyc": "NYC · Remote", "remote": "Remote",
+    "nyc": "NYC", "remote+nyc": "NYC · Remote",
     "sf": "SF", "remote+sf": "SF · Remote", "nyc+sf": "NYC · SF",
     "remote+nyc+sf": "NYC · SF · Remote",
     "international": "Intl", "unknown": "—",
@@ -281,15 +278,14 @@ def _card(row: dict, priority: bool) -> str:
 
 _GEO_LABEL = {
     0: "New York City",
-    1: "San Francisco", 
-    2: "Hybrid (NYC/SF + Remote)",
-    3: "Remote (US-wide)",
+    1: "San Francisco",
+    2: "NYC / SF",
     4: "International"
 }
 
 
 def _render_bucket(rows: list) -> str:
-    """Render cards grouped into geo blocks: NYC → SF → Remote.
+    """Render cards grouped into geo blocks: NYC → SF → both.
     Dividers carry data-sec so JS can hide a heading when all its cards filter out."""
     geo_counts: dict = {}
     for r in rows:
@@ -312,14 +308,42 @@ def _render_bucket(rows: list) -> str:
     return "\n".join(parts)
 
 
-_PAGE_DESC = ("Live aggregator of PM roles from Greenhouse, Ashby, Lever, and other ATS · "
-              "filtered to NYC, SF, and U.S. remote · entry to mid-level")
+_SOURCE_LABELS = {
+    "greenhouse":  "Greenhouse",
+    "ashby":       "Ashby",
+    "lever":       "Lever",
+    "workable":    "Workable",
+    "muse":        "The Muse",
+    "hiring.cafe": "hiring.cafe",
+    "yc":          "YC Jobs",
+    "wellfound":   "Wellfound",
+    "adzuna":      "Adzuna",
+}
+
+_DESC_TAIL = "· filtered to NYC and SF · entry to mid-level"
+
+
+def _page_desc(rows: list) -> str:
+    """Name only the sources that actually produced these roles.
+
+    Static copy goes stale silently: a missing Bright Data key drops three
+    sources to inert, and the page would still claim them. SCRAPER_RULES applies
+    to the page copy too, not just the cards.
+    """
+    seen = {(r.get("source") or "").strip().lower() for r in rows}
+    names = [label for key, label in _SOURCE_LABELS.items() if key in seen]
+    names += [html.escape(s) for s in sorted(seen - set(_SOURCE_LABELS)) if s]
+    if not names:
+        return f"Live aggregator of PM roles from hiring APIs {_DESC_TAIL}"
+    joined = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " &amp; " + names[-1]
+    return f"Live aggregator of PM roles from {joined} {_DESC_TAIL}"
 
 
 def build():
     if not os.path.exists(CSV_IN):
-        sys.exit(f"No {CSV_IN}. Run: python3 pmfarm.py local --all-levels")
+        sys.exit(f"No {CSV_IN}. Run: python3 pmfarm.py")
     rows = list(csv.DictReader(open(CSV_IN, newline="", encoding="utf-8")))
+    page_desc = _page_desc(rows)
     if rows and "years_sentence" not in rows[0]:
         print("WARNING: pm_roles.csv has no years_sentence column. Years will show "
               "'not stated'. Regenerate with the updated pmfarm.py for verbatim JD "
@@ -347,7 +371,7 @@ def build():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <meta property="og:title" content="PM Roles — Live Board">
-<meta property="og:description" content="{_PAGE_DESC}">
+<meta property="og:description" content="{page_desc}">
 <meta property="og:url" content="https://sperowli.github.io/pm-farm/pm_roles.html">
 <title>PM Roles — {today}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -472,13 +496,12 @@ def build():
     <div class="hbrand"><h1>PM Roles</h1><span class="subtitle">updated {today}</span></div>
     <span class="count" id="count">{len(bucket_a)} shown</span>
   </div>
-  <p class="hdesc">{_PAGE_DESC}</p>
+  <p class="hdesc">{page_desc}</p>
   <input class="search" id="q" type="search" placeholder="Search company, title, location…" autocomplete="off">
   <div class="chips" id="chips">
     <button class="chip" data-f="apm"    aria-pressed="false">APM</button>
     <button class="chip" data-f="nyc"    aria-pressed="false">NYC</button>
     <button class="chip" data-f="sf"     aria-pressed="false">SF</button>
-    <button class="chip" data-f="remote" aria-pressed="false">Remote</button>
     <button class="chip" data-f="pri"    aria-pressed="false" title="Entry-level, priority sectors, and founding roles">Priority</button>
   </div>
  </div>
@@ -511,13 +534,12 @@ def build():
   const active = new Set();
 
   const ROLE_TYPES = ['pm','apm'];
-  const LOC_TYPES  = ['nyc','sf','remote','intl'];
+  const LOC_TYPES  = ['nyc','sf','intl'];
 
   function locMatch(card, f) {{
     const lc = card.dataset.loc;
     if (f === 'nyc')    return ['nyc','remote+nyc','nyc+sf','remote+nyc+sf'].includes(lc);
     if (f === 'sf')     return ['sf','remote+sf','nyc+sf','remote+nyc+sf'].includes(lc);
-    if (f === 'remote') return lc.startsWith('remote');
     if (f === 'intl')   return lc === 'international';
     return true;
   }}

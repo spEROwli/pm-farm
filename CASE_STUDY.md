@@ -25,7 +25,7 @@ Build a lightweight tool that answers one question:
 The first useful version focused on a few constraints:
 
 - PM and APM roles only
-- New York City, San Francisco, and U.S. remote
+- New York City and San Francisco
 - Recent postings
 - Deduplication across repeated listings
 - Source data preserved as returned

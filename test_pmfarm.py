@@ -138,32 +138,27 @@ def test_3_years():
         check(f"years/{desc[:40]}", raw, want)
 
 
-# ── TEST 4: remote toggle + unknown-loc exclusion (P2) ───────────────────────
+# ── TEST 4: NYC/SF-only location gate + unknown-loc exclusion (P2) ───────────
 
-def test_4_remote_toggle():
-    header(4, "remote toggle + unknown-loc exclusion")
+def test_4_location_gate():
+    header(4, "NYC/SF-only location gate + unknown-loc exclusion")
     jobs = [
         {"company": "a", "title": "Product Manager", "url": "u/a", "loc_class": "remote"},
         {"company": "b", "title": "Product Manager", "url": "u/b", "loc_class": "remote+nyc"},
         {"company": "c", "title": "Product Manager", "url": "u/c", "loc_class": "nyc"},
         {"company": "d", "title": "Product Manager", "url": "u/d", "loc_class": "unknown"},
         {"company": "e", "title": "Product Manager", "url": "u/e", "loc_class": "international"},
+        {"company": "f", "title": "Product Manager", "url": "u/f", "loc_class": "remote+sf"},
     ]
-    # default: unknown excluded; international included (ranked below remote-US)
-    default  = [j for j in jobs if pmfarm._passes_location(j["loc_class"], False)]
+    # default: city-anchored only — unknown, international, and US-wide remote excluded
+    default  = [j for j in jobs if pmfarm._passes_location(j["loc_class"])]
     # --include-unknown-loc: unknown also included
-    incl_unk = [j for j in jobs if pmfarm._passes_location(j["loc_class"], False, include_unknown=True)]
-    # --remote-only: only remote variants (no nyc, no unknown, no international)
-    ro_only  = [j for j in jobs if pmfarm._passes_location(j["loc_class"], True)]
-    # --remote-only --include-unknown-loc: remote + unknown (not international)
-    ro_unk   = [j for j in jobs if pmfarm._passes_location(j["loc_class"], True, include_unknown=True)]
+    incl_unk = [j for j in jobs if pmfarm._passes_location(j["loc_class"], include_unknown=True)]
 
     def cos(lst): return sorted(j["company"] for j in lst)
 
-    print(f"  default (no flags)              : {cos(default)}   (want a,b,c,e — not d)")
-    print(f"  --include-unknown-loc           : {cos(incl_unk)}  (want a,b,c,d,e)")
-    print(f"  --remote-only                   : {cos(ro_only)}   (want a,b — no nyc/unknown/intl)")
-    print(f"  --remote-only --include-unknown : {cos(ro_unk)}    (want a,b,d)")
+    print(f"  default (no flags)     : {cos(default)}   (want b,c,f — not a,d,e)")
+    print(f"  --include-unknown-loc  : {cos(incl_unk)}  (want b,c,d,f)")
 
     # international location detection
     check("_loc_class: non-empty non-US → international",  pmfarm._loc_class("Barcelona, Spain", ""), "international")
@@ -173,11 +168,12 @@ def test_4_remote_toggle():
 
     check("default: unknown excluded",                    "d" not in cos(default), True)
     check("default: international excluded",              "e" not in cos(default), True)
-    check("default: nyc/remote/remote+nyc pass",         len(default), 3)
-    check("include-unknown: nyc/remote/remote+nyc/unk pass", len(incl_unk), 4)
-    check("remote-only: no nyc/unknown/international",   len(ro_only), 2)
-    check("remote-only+unknown: adds unknown not intl",  len(ro_unk), 3)
-    check("default CSV: zero unknown rows",              all(j["loc_class"] != "unknown" for j in default), True)
+    check("default: US-wide remote excluded",             "a" not in cos(default), True)
+    check("default: city+remote still passes",            "b" in cos(default) and "f" in cos(default), True)
+    check("default: nyc/remote+nyc/remote+sf pass",       len(default), 3)
+    check("include-unknown: adds unknown, not remote/intl", len(incl_unk), 4)
+    check("include-unknown: still no US-wide remote",     "a" not in cos(incl_unk), True)
+    check("default CSV: zero unknown rows",               all(j["loc_class"] != "unknown" for j in default), True)
 
 
 # ── TEST 5: seniority filter — no false positives or false negatives ─────────
@@ -321,9 +317,9 @@ def test_7_idempotency():
         pmfarm.APPLIED_FILE     = os.path.join(tmpdir, "applied.csv")
 
         pmfarm.OUTPUT_FILE = tmp1
-        pmfarm.cmd_local(remote_only=False)
+        pmfarm.cmd_local()
         pmfarm.OUTPUT_FILE = tmp2
-        pmfarm.cmd_local(remote_only=False)
+        pmfarm.cmd_local()
 
         with open(tmp1, newline="", encoding="utf-8") as f1, \
              open(tmp2, newline="", encoding="utf-8") as f2:
@@ -547,7 +543,7 @@ def test_10_slug_resolution():
         pmfarm.APPLIED_FILE     = os.path.join(tmpdir, "applied.csv")
 
         pmfarm._slug_resolution.clear()
-        pmfarm.cmd_local(remote_only=False)
+        pmfarm.cmd_local()
 
         res = dict(pmfarm._slug_resolution)
     finally:
@@ -766,11 +762,21 @@ def test_12_edge_cases():
     check("sort: fresh (2d) before stale (61d)",
           build_page._fit_key(fresh) < build_page._fit_key(stale), True)
 
-    # ── build_page: international ranks after remote ──────────────────────────
-    remote_row = {"loc_class": "remote",        "days_old": "5", "years_raw": "2", "years_sentence": "", "title": "PM", "hw_signal": ""}
-    intl_row   = {"loc_class": "international", "days_old": "1", "years_raw": "2", "years_sentence": "", "title": "PM", "hw_signal": ""}
-    check("sort: remote (5d) before international (1d)",
-          build_page._fit_key(remote_row) < build_page._fit_key(intl_row), True)
+    # ── build_page: geo ranking is NYC → SF → both cities → international ─────
+    # US-wide remote is not a target geography, so it never reaches the page.
+    def _geo_row(lc, days):
+        return {"loc_class": lc, "days_old": days, "years_raw": "2",
+                "years_sentence": "", "title": "PM", "hw_signal": ""}
+    nyc_row  = _geo_row("nyc",           "5")
+    sf_row   = _geo_row("sf",            "5")
+    hybrid   = _geo_row("remote+nyc",    "5")
+    intl_row = _geo_row("international", "1")
+    check("sort: nyc (5d) before sf (5d)",
+          build_page._fit_key(nyc_row) < build_page._fit_key(sf_row), True)
+    check("sort: sf before city+remote hybrid",
+          build_page._fit_key(sf_row) < build_page._fit_key(hybrid), True)
+    check("sort: city+remote (5d) before international (1d)",
+          build_page._fit_key(hybrid) < build_page._fit_key(intl_row), True)
 
     # ── _loc_class: snippet text must NOT affect classification ───────────────
     # Boston role with "remote" in JD body was formerly misclassified as remote.
@@ -908,7 +914,7 @@ if __name__ == "__main__":
     test_1_dedupe()
     test_2_missing_file()
     test_3_years()
-    test_4_remote_toggle()
+    test_4_location_gate()
     test_5_seniority()
     test_6_dead_slug()
     test_7_idempotency()

@@ -1,6 +1,6 @@
 # PM Farm
 
-PM Farm is a job-search intelligence pipeline that pulls Product Manager and Associate Product Manager roles from eight live hiring sources, filters them to a focused target profile, and publishes a triage-ready dashboard for daily review.
+PM Farm is a job-search intelligence pipeline that pulls Product Manager and Associate Product Manager roles from live hiring APIs, filters them to a focused target profile, and publishes a triage-ready dashboard for daily review.
 
 **[Live dashboard](https://sperowli.github.io/pm-farm/pm_roles.html)** · **[Case study](CASE_STUDY.md)**
 
@@ -8,8 +8,9 @@ PM Farm is a job-search intelligence pipeline that pulls Product Manager and Ass
 
 ## What it does
 
-- Pulls roles from Greenhouse, Ashby, Lever, Workable, The Muse, YC Jobs, Wellfound, and hiring.cafe.
-- Filters to PM and APM roles in New York City, San Francisco, and U.S. remote.
+- Pulls roles from five keyless hiring APIs: Greenhouse, Ashby, Lever, Workable, and The Muse.
+- Adds hiring.cafe, YC Jobs, and Wellfound when a Bright Data key is configured. Without a key they stay inert and cost nothing, so the public dashboard runs on the five above.
+- Filters to PM and APM roles in New York City and San Francisco. A role that also offers remote still counts; US-wide remote postings with no city attached do not.
 - Prioritizes recent postings.
 - Removes obvious seniority mismatches.
 - Deduplicates repeated listings.
@@ -86,6 +87,8 @@ python3 test_pmfarm.py
 | hiring.cafe | via Bright Data Web Unlocker | API key, GitHub secret |
 | YC Jobs | `ycombinator.com/jobs` via Bright Data Web Unlocker | API key, GitHub secret |
 | Wellfound | `wellfound.com/role/l` via Bright Data Web Unlocker | API key, GitHub secret |
+
+The three Bright Data sources skip themselves and log `inert` when no key is present, so a keyless run is a clean five-source run rather than a failure. Adzuna is not a listing source: `discover.py --from-adzuna` uses it to seed company names, which are then scraped directly from their own ATS.
 
 ### Stack
 
